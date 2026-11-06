@@ -1,0 +1,245 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="Daily NFL and NBA player props: each player&#39;s last 5 games against the Vegas line, marked green to hit or red to miss.">
+<title>Prop Exchange Board</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
+<style>
+/* Layout: trading-floor board. Ticker tape of the strongest plays, then one collapsible "sector" per game, players as sub-rows, each prop a quote line. Deliberately single dark theme. */
+:root{
+  color-scheme:dark;
+  --bg:#070b10; --panel:#0d141c; --panel2:#111b26; --grid:#1b2835; --rule:#26384a;
+  --fg:#dbe4ee; --muted:#7a8ca0; --amber:#f2b33d;
+  --up:#21c46b; --up-bg:#0d2a1b; --down:#f0484a; --down-bg:#2e1012;
+  --cond:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+*{box-sizing:border-box}
+body{margin:0}
+body{background:var(--bg);color:var(--fg);font-family:var(--mono);font-size:13px;line-height:1.4}
+body::before{content:"";position:fixed;inset:0 0 auto;height:env(safe-area-inset-top,0px);z-index:10;background:var(--panel)}
+.gut{padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px))}
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--panel);border-bottom:1px solid var(--rule)}
+.bar{max-width:1240px;margin:0 auto;padding-block:10px;display:flex;flex-wrap:wrap;gap:10px 18px;align-items:center;justify-content:space-between}
+.brand{display:flex;align-items:baseline;gap:10px}
+.brand h1{margin:0;font-family:var(--cond);font-weight:800;font-size:26px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber)}
+.brand small{color:var(--muted);font-size:11px;letter-spacing:.08em;text-transform:uppercase}
+.ctrls{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.seg{display:flex;border:1px solid var(--rule);border-radius:3px;overflow:hidden}
+.seg button{background:transparent;color:var(--muted);border:0;padding:6px 12px;font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.08em;cursor:pointer;text-transform:uppercase}
+.seg button[aria-pressed="true"]{background:var(--amber);color:#111}
+select,input{background:var(--bg);color:var(--fg);border:1px solid var(--rule);border-radius:3px;padding:6px 8px;font-family:var(--mono);font-size:12px;min-width:0}
+input{width:160px}
+button:focus-visible,select:focus-visible,input:focus-visible,summary:focus-visible{outline:2px solid var(--amber);outline-offset:1px}
+.tape{overflow:hidden;border-top:1px solid var(--grid);background:var(--bg);white-space:nowrap}
+.tape-inner{display:inline-flex;gap:28px;padding:6px 0;animation:tape 90s linear infinite}
+.tape span b{color:var(--fg)} .tape .u{color:var(--up)} .tape .d{color:var(--down)}
+@keyframes tape{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.tape-inner{animation:none}}
+main{max-width:1240px;margin:0 auto;padding-block:16px 48px;display:grid;gap:12px}
+main>*,#board>*{min-width:0}
+.status{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:12px}
+.status b{color:var(--fg);font-weight:600}
+.status .u{color:var(--up)} .status .d{color:var(--down)}
+.empty{border:1px dashed var(--rule);padding:28px;text-align:center;color:var(--muted)}
+.empty b{display:block;color:var(--fg);font-family:var(--cond);font-size:22px;letter-spacing:.06em;text-transform:uppercase}
+details.game{background:var(--panel);border:1px solid var(--grid);border-radius:3px}
+details.game>summary{list-style:none;cursor:pointer;display:grid;grid-template-columns:auto 1fr auto;gap:6px 14px;align-items:center;padding:10px 12px;border-bottom:1px solid transparent}
+details.game[open]>summary{border-bottom-color:var(--rule);background:var(--panel2)}
+summary::-webkit-details-marker{display:none}
+.caret{color:var(--amber);font-size:11px;width:10px;transition:transform .15s}
+details[open] .caret{transform:rotate(90deg)}
+.gname{font-family:var(--cond);font-weight:700;font-size:21px;letter-spacing:.04em;text-transform:uppercase;line-height:1.1;min-width:0}
+.gname em{font-style:normal;color:var(--muted);font-weight:500;padding:0 6px}
+.gmeta{grid-column:2/4;display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--muted);font-size:12px}
+.gmeta b{color:var(--fg);font-weight:500}
+.gcount{display:flex;gap:6px;font-weight:600}
+.pill{padding:2px 7px;border-radius:2px;font-size:12px}
+.pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
+.tbl{overflow-x:auto}
+table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;min-width:640px}
+th{font-family:var(--cond);font-weight:600;font-size:12px;letter-spacing:.1em;text-transform:uppercase;color:var(--muted);text-align:right;padding:6px 10px;border-bottom:1px solid var(--grid);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+td{padding:5px 10px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
+tr.player td{background:var(--bg);padding-top:9px;padding-bottom:6px;border-bottom:1px solid var(--rule)}
+tr.player .pn{font-family:var(--cond);font-weight:700;font-size:17px;letter-spacing:.05em;text-transform:uppercase}
+tr.player .tm{color:var(--amber);font-weight:600;margin-left:8px;font-size:12px}
+tr.player .ps{color:var(--muted);font-size:12px;margin-left:10px}
+tr.q:hover td{background:var(--panel2)}
+td.stat{color:var(--fg);padding-left:22px}
+.l5{display:inline-flex;gap:3px}
+.l5 i{font-style:normal;display:inline-block;min-width:38px;padding:1px 4px;text-align:center;border-radius:2px;font-size:12px}
+.l5 i.h{background:var(--up-bg);color:var(--up)} .l5 i.m{background:var(--down-bg);color:var(--down)}
+.l5 i.new{outline:1px solid currentColor}
+.chg.u{color:var(--up)} .chg.d{color:var(--down)}
+.hit{font-weight:700;font-size:14px;min-width:84px}
+.hit span{display:inline-block;padding:2px 8px;border-radius:2px;min-width:74px;text-align:center}
+.hit.u span{background:var(--up);color:#04140b} .hit.d span{background:var(--down);color:#1d0405}
+.odds{color:var(--muted)}
+.foot{color:var(--muted);font-size:12px;max-width:90ch;line-height:1.6}
+.foot b{color:var(--fg);font-weight:600}
+@media (max-width:640px){.brand small{display:none} input{width:120px} .gname{font-size:18px}}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="gut"><div class="bar">
+    <div class="brand"><h1>Prop Exchange</h1><small>Last 5 vs. the Vegas line</small></div>
+    <div class="ctrls">
+      <div class="seg" role="group" aria-label="League">
+        <button type="button" id="lgAll" data-lg="ALL" aria-pressed="true">All</button>
+        <button type="button" id="lgNFL" data-lg="NFL" aria-pressed="false">NFL</button>
+        <button type="button" id="lgNBA" data-lg="NBA" aria-pressed="false">NBA</button>
+      </div>
+      <select id="show" aria-label="Show">
+        <option value="all">All props</option>
+        <option value="hit">Hits only (green)</option>
+        <option value="miss">Misses only (red)</option>
+        <option value="5">5 of 5 only</option>
+      </select>
+      <select id="stat" aria-label="Stat"><option value="">Every stat</option></select>
+      <input id="q" type="search" placeholder="Find player" aria-label="Find player">
+    </div>
+  </div></div>
+  <div class="tape" aria-label="Strongest plays"><div class="tape-inner" id="tape"><span>Loading lines…</span></div></div>
+</header>
+
+<main class="gut">
+  <div class="status" id="status"><span>Connecting to the board…</span></div>
+  <div id="board" style="display:grid;gap:12px">
+    <div class="empty"><b>Loading today's board</b>Games, players and their last five games appear here after each daily update.</div>
+  </div>
+  <p class="foot">
+    <b>How a call is made.</b> Lines come from scoresandodds.com. The line shown is the consensus: the midpoint of the best over and best under on the board. Each of the player's last 5 games (from ESPN game logs, newest on the right) is green if it went over that line and red if it did not. <b>Hit %</b> is the share of those 5 games that went over. <b>Green means 3 or more of 5 went over</b>, so the trend says hit. Red means the trend says miss. <b>vs Line</b> is the 5-game average minus the line. Five games is a small sample and ignores injuries, matchups and minutes, so treat this as one input, not a sure thing.
+  </p>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+let league = "ALL", show = "all", statF = "", q = "";
+let run = null, games = [];
+const openState = new Set();
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const f1 = n => (Math.round(n*10)/10).toString();
+function lsGet(k){try{return localStorage.getItem(k)}catch(e){return null}}
+function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
+const saved = lsGet("pex.league"); if (saved) league = saved;
+
+document.querySelectorAll("[data-lg]").forEach(b => b.onclick = () => { league = b.dataset.lg; lsSet("pex.league", league); render(); });
+$("show").onchange = () => { show = $("show").value; render(); };
+$("stat").onchange = () => { statF = $("stat").value; render(); };
+$("q").oninput = () => { q = $("q").value.trim().toLowerCase(); render(); };
+
+function when(iso){
+  if(!iso) return "Time TBD";
+  const d = new Date(iso);
+  return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
+}
+function keep(p){
+  if (show === "hit" && p.call !== "hit") return false;
+  if (show === "miss" && p.call !== "miss") return false;
+  if (show === "5" && p.hits !== 5) return false;
+  if (statF && p.stat !== statF) return false;
+  return true;
+}
+function oddsTxt(o){ return o ? `${o.line} ${o.odds}` : "—"; }
+
+function render(){
+  document.querySelectorAll("[data-lg]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lg === league)));
+  const list = games.filter(g => league === "ALL" || g.league === league).sort((a,b) => (a.start||"").localeCompare(b.start||""));
+
+  // stat options
+  const stats = [...new Set(list.flatMap(g => g.players.flatMap(p => p.props.map(x => x.stat))))].sort();
+  const cur = $("stat").value;
+  $("stat").innerHTML = `<option value="">Every stat</option>` + stats.map(s => `<option${s===cur?" selected":""}>${esc(s)}</option>`).join("");
+  if (cur && !stats.includes(cur)) statF = "";
+
+  // status
+  let all = list.flatMap(g => g.players.flatMap(p => p.props));
+  const ups = all.filter(x => x.call === "hit").length;
+  if (run) {
+    const upd = new Date(run.createdAt);
+    const errs = Object.entries(run.leagues||{}).filter(([,v]) => v.error).map(([k]) => k);
+    $("status").innerHTML = `<span>Updated <b>${esc(upd.toLocaleString([], {weekday:"short", hour:"numeric", minute:"2-digit"}))}</b></span>
+      <span><b>${list.length}</b> games</span><span><b>${all.length}</b> props</span>
+      <span class="u">▲ ${ups} hit</span><span class="d">▼ ${all.length-ups} miss</span>
+      ${errs.length ? `<span class="d">${errs.join(", ")} lines could not be loaded on the last update</span>` : ""}`;
+  }
+
+  // tape: strongest plays
+  const top = list.flatMap(g => g.players.flatMap(p => p.props.map(x => ({p, x})))).filter(o => o.x.hits === 5)
+    .sort((a,b) => (b.x.avg - b.x.line)/Math.max(b.x.line,1) - (a.x.avg - a.x.line)/Math.max(a.x.line,1)).slice(0, 24);
+  const tapeItems = top.length ? top.map(({p,x}) => `<span><b>${esc(p.name.toUpperCase())}</b> ${esc(x.stat)} o${x.line} <span class="u">▲ ${x.pct}%</span> avg ${f1(x.avg)}</span>`).join("")
+    : `<span>No 5-for-5 plays on the board right now.</span>`;
+  $("tape").innerHTML = tapeItems + tapeItems;
+
+  const board = $("board");
+  if (!run) return;
+  if (!list.length) {
+    board.innerHTML = `<div class="empty"><b>No ${league === "ALL" ? "" : league + " "}games on the board</b>The next daily update will add games once Vegas posts player props for them.</div>`;
+    return;
+  }
+  let firstOpen = openState.size === 0;
+  board.innerHTML = list.map((g, gi) => {
+    const a = g.teams?.away || {}, h = g.teams?.home || {};
+    const players = g.players.map(p => ({...p, props: p.props.filter(keep)}))
+      .filter(p => p.props.length && (!q || p.name.toLowerCase().includes(q)));
+    const props = g.players.flatMap(p => p.props);
+    const gu = props.filter(x => x.call === "hit").length;
+    const key = g.league + g.id;
+    const open = openState.has(key) || (firstOpen && gi === 0) || (q && players.length);
+    if (firstOpen && gi === 0) openState.add(key);
+    const spread = a.spread?.v ? `${esc(a.abbr || a.name)} ${esc(a.spread.v)}` : "";
+    const rows = players.map(p => {
+      const pu = p.props.filter(x => x.call === "hit").length;
+      return `<tr class="player"><td colspan="7"><span class="pn">${esc(p.name)}</span><span class="tm">${esc(p.team||"")}</span><span class="ps">${pu} of ${p.props.length} props trending over</span></td></tr>` +
+      p.props.map(x => {
+        const chg = x.avg - x.line, up = x.call === "hit";
+        const cells = [...x.last5].reverse().map((v, i, arr) =>
+          `<i class="${v.v > x.line ? "h" : "m"}${i===arr.length-1 ? " new" : ""}" title="${esc(v.date)} ${esc(v.atVs)} ${esc(v.opp)}">${f1(v.v)}</i>`).join("");
+        return `<tr class="q"><td class="stat">${esc(x.stat)}</td><td>${x.line}</td><td><span class="l5">${cells}</span></td>
+          <td>${f1(x.avg)}</td><td class="chg ${chg>0?"u":"d"}">${chg>0?"▲ +":"▼ "}${f1(chg)}</td>
+          <td class="odds">o ${esc(oddsTxt(x.over))}<br>u ${esc(oddsTxt(x.under))}</td>
+          <td class="hit ${up?"u":"d"}"><span>${up?"▲":"▼"} ${x.pct}%</span></td></tr>`;
+      }).join("");
+    }).join("");
+    return `<details class="game" data-key="${esc(key)}"${open ? " open" : ""}>
+      <summary>
+        <span class="caret">▶</span>
+        <span class="gname">${esc(a.name)}<em>@</em>${esc(h.name)}</span>
+        <span class="gcount"><span class="pill u">▲ ${gu}</span><span class="pill d">▼ ${props.length-gu}</span></span>
+        <span class="gmeta"><span><b>${esc(g.league)}</b></span><span>${esc(when(g.start))}</span>
+          ${spread ? `<span>Spread <b>${spread}</b></span>` : ""}
+          ${a.total?.v ? `<span>Total <b>${esc(a.total.v.replace(/^o/,""))}</b></span>` : ""}
+          ${a.ml?.v || a.ml?.odds ? `<span>ML <b>${esc(a.abbr||a.name)} ${esc(a.ml.v||a.ml.odds)} / ${esc(h.abbr||h.name)} ${esc(h.ml?.v||h.ml?.odds||"")}</b></span>` : ""}
+        </span>
+      </summary>
+      <div class="tbl">${rows ? `<table><thead><tr><th>Player / Stat</th><th>Line</th><th>Last 5 (old → new)</th><th>Avg</th><th>vs Line</th><th>Over / Under</th><th>Hit %</th></tr></thead><tbody>${rows}</tbody></table>`
+        : `<div class="empty" style="margin:12px;border-color:var(--grid)">No props in this game match your filters.</div>`}</div>
+    </details>`;
+  }).join("");
+  board.querySelectorAll("details.game").forEach(d => d.addEventListener("toggle", () => {
+    d.open ? openState.add(d.dataset.key) : openState.delete(d.dataset.key);
+  }));
+}
+
+(async () => {
+  try {
+    const res = await fetch("data/board.json?t=" + Date.now(), {cache: "no-store"});
+    if (!res.ok) throw new Error(res.status);
+    const b = await res.json();
+    run = {run: b.run, createdAt: b.createdAt, leagues: b.leagues};
+    games = b.games || [];
+    render();
+  } catch (e) {
+    $("status").innerHTML = `<span class="d">The board data could not be loaded. Refresh the page to try again.</span>`;
+    $("board").innerHTML = `<div class="empty"><b>No board yet</b>Today's data has not been published. Check back after the daily update.</div>`;
+  }
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,36 @@
+name: Update board
+
+on:
+  schedule:
+    # Every day at 18:14 UTC (1:14 PM Eastern in winter, 2:14 PM in summer)
+    - cron: "14 18 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: update-board
+  cancel-in-progress: false
+
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build today's board
+        run: python3 build_board.py data/board.json
+
+      - name: Commit the new data
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898182+github-actions[bot]@users.noreply.github.com"
+          git add data/board.json
+          if git diff --cached --quiet; then
+            echo "Board unchanged."
+          else
+            git commit -m "Update board $(date -u +%Y-%m-%d)"
+            git push
+          fi
