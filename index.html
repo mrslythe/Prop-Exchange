@@ -104,7 +104,12 @@ td.stat{color:var(--fg);padding-left:22px}
 .hit.u span{background:var(--up);color:#04140b} .hit.d span{background:var(--down);color:#1d0405}
 .odds{color:var(--muted)}
 td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
-.foot{color:var(--muted);font-size:12px;max-width:90ch;line-height:1.6}
+.foot{color:var(--muted);font-size:12px;max-width:90ch;line-height:1.6;border-top:1px solid var(--grid);padding-top:10px}
+.foot summary{cursor:pointer;color:var(--fg);font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;list-style:none;display:inline-flex;gap:8px;align-items:center}
+.foot summary::-webkit-details-marker{display:none}
+.foot summary::before{content:"▶";color:var(--amber);font-size:10px;transition:transform .15s}
+.foot[open] summary::before{transform:rotate(90deg)}
+.foot ul{margin:8px 0 0;padding-left:18px;display:grid;gap:4px}
 .foot b{color:var(--fg);font-weight:600}
 @media (max-width:640px){.brand small{display:none} input{width:120px} .gname{font-size:18px}}
 </style>
@@ -141,9 +146,17 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
   <div id="board" style="display:grid;gap:12px">
     <div class="empty"><b>Loading today's board</b>Games, players and their last five games appear here after each daily update.</div>
   </div>
-  <p class="foot">
-    <b>How a call is made.</b> Lines come from scoresandodds.com. The line shown is the consensus: the midpoint of the best over and best under on the board. Stats come from ESPN game logs. <b>Last 5</b> shows the player's five most recent games, newest on the right, green when the game went over the line. <b>Season</b> is every game this season against the same line. <b>Projected</b> blends the two: 60% season hit rate plus 40% last-5 hit rate, so a hot or cold week counts without outweighing the whole season. Early in a season, with fewer than 5 games played, it leans more on the last 5, which reach back into last season. <b>Green means projected 55% or higher</b>; red means lower. <b>Vegas %</b> is the chance the sportsbook's over price implies (it includes their cut), so a projection well above it is the more interesting play. <b>Tap a player's name</b> to see every regular-season and playoff game of his career against today's opponent, measured against today's lines. 🔥 marks a prop he has gone over in at least 60% of 3 or more games against this team. This is for reference only and does not change the Projected %. <b>Badges:</b> 🎂 the game falls on the player's birthday (by Eastern time). 😤 the opponent is a team the player played for last season. 🏠 the arena is within 35 miles of where the player was born. 📍 the game is in the player's birth state (or birth country, outside the US). Birthplaces come from ESPN and show where a player was born, not always where he grew up. These numbers ignore injuries, matchups and minutes, so treat them as one input, not a sure thing.
-  </p>
+  <details class="foot" id="howto">
+    <summary>How a call is made</summary>
+    <ul>
+      <li><b>Line:</b> consensus from scoresandodds.com (midpoint of the best over and under).</li>
+      <li><b>Projected %:</b> 60% season hit rate + 40% last-5 hit rate. <b>Green = 55%+</b>, red below.</li>
+      <li><b>Vegas %:</b> the chance the over price implies. Projected well above it is the better play.</li>
+      <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
+      <li><b>Badges:</b> 🎂 birthday · 😤 faces last season's team · 🏠 born within 35 miles · 📍 home state.</li>
+      <li>Stats from ESPN. Ignores injuries and matchups, so treat it as one input.</li>
+    </ul>
+  </details>
 </main>
 
 <script>
