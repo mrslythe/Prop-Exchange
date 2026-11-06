@@ -142,9 +142,9 @@ details.record[open]>summary{border-bottom:1px solid var(--rule);background:var(
 .precent{display:flex;flex-wrap:wrap;gap:6px}
 .precent span{font-size:11px;padding:2px 7px;border-radius:2px;background:var(--panel2);border:1px solid var(--rule)}
 .precent span.w{color:var(--up);border-color:var(--up)} .precent span.l{color:var(--down)}
-.dvp{display:block;margin-top:3px;font-size:12px;color:var(--muted);font-family:var(--mono);letter-spacing:0;text-transform:none}
+.dvp{display:block;margin-top:2px;font-size:10.5px;color:var(--muted);font-family:var(--mono);letter-spacing:0;text-transform:none}
 .dvp b{color:var(--fg);font-weight:500}
-.tier{display:inline-block;padding:0 6px;border-radius:2px;font-size:11px;font-weight:700;margin-left:6px;letter-spacing:.04em}
+.tier{display:inline-block;padding:0 5px;border-radius:2px;font-size:10px;font-weight:700;margin-right:6px;letter-spacing:.04em}
 .tier.tough{background:var(--down-bg);color:var(--down)} .tier.easy{background:var(--up-bg);color:var(--up)} .tier.neutral{background:var(--panel2);color:var(--muted);border:1px solid var(--rule)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px}
 .pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
@@ -266,7 +266,7 @@ const ord = n => n + (["th","st","nd","rd"][(n % 100 - 20) % 10] || ["th","st","
 function dvpLine(p){
   const m = p.matchup; if (!m) return "";
   const nick = (m.opp || "").split(" ").pop();
-  return `<span class="dvp" title="Ranked 1 (allows the least) to ${m.of} (allows the most), over ${m.games} games this season. League average: ${m.avg}.">${esc(nick)} D vs ${POSN[m.pos] || m.pos}: <b>${m.allowed} ${esc(m.stat)}/game</b> allowed · ranks ${ord(m.rank)} of ${m.of}<span class="tier ${esc(m.tier)}">${TIER[m.tier] || ""}</span></span>`;
+  return `<span class="dvp" title="Ranked 1 (allows the least) to ${m.of} (allows the most), over ${m.games} games this season. League average: ${m.avg}."><span class="tier ${esc(m.tier)}">${TIER[m.tier] || ""}</span>${esc(nick)} D vs ${POSN[m.pos] || m.pos}: <b>${m.allowed} ${esc(m.stat)}/game</b> allowed · ranks ${ord(m.rank)} of ${m.of}</span>`;
 }
 let parlays = [], rec = null;
 const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
