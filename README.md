@@ -11,6 +11,8 @@ A daily board of NFL and NBA player props. For every game it lists the players w
 - **Projected %** = 60% × season hit rate + 40% × last-5 hit rate, both against the same line. With fewer than 5 games this season it leans on the last 5, which reach back into last season. 55% or higher is green; otherwise red.
 - **Vegas %** is the chance implied by the sportsbook's over price, shown for comparison.
 - **Career vs today's opponent**: tap a player's name to open every regular-season and playoff game of his career against that day's opponent, measured against today's lines (games, how many went over, average, each game's number). 🔥 marks a prop he has cleared in at least 60% of 3+ games against that team. Reference only: it does not change the Projected %.
+- **Injuries** (ESPN injury report): ⚠️ questionable or day-to-day; players listed out, doubtful, suspended or on injured reserve are greyed out and get no call.
+- **Track record**: every call is saved just before its game starts (`data/picks/<date>.json`) and graded after the game against ESPN's final stats (`track.py`). `data/record.json` holds the running totals the site shows: how often green calls went over, how often red calls went under, by league, stat and projection range. Pushes and players who did not play are not counted.
 - **Badges** (from ESPN player records): 🎂 the game is on the player's birthday · 😤 revenge game, the opponent is a team he played for last season · 🏠 hometown game, the arena is within 35 miles of his birthplace · 📍 home-state (or home-country) game. Distances use the US Census place list in `data/us_places.tsv`.
 - Props for players with fewer than 5 games this season are left out.
 
@@ -21,8 +23,9 @@ Five games is a small sample and ignores injuries, matchups and minutes. Treat i
 | File | What it does |
 | --- | --- |
 | `index.html` | The board. Loads `data/board.json`. |
-| `build_board.py` | Pulls the lines and game logs and writes `data/board.json`. Python 3 standard library plus `curl`. |
-| `.github/workflows/update-board.yml` | Runs the builder every day at 18:14 UTC and commits the new data. Can also be run by hand from the Actions tab. |
+| `build_board.py` | Pulls the lines, game logs and injury report and writes `data/board.json`, then runs the tracker. Python 3 standard library plus `curl`. |
+| `track.py` | Saves each call before its game and grades it afterward; writes `data/picks/` and `data/record.json`. |
+| `.github/workflows/update-board.yml` | Runs the builder twice a day (14:44 and 21:44 UTC) and commits the new data. Can also be run by hand from the Actions tab. |
 
 ## Run it yourself
 

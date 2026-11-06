@@ -2,8 +2,11 @@ name: Update board
 
 on:
   schedule:
-    # Every day at 18:14 UTC (1:14 PM Eastern in winter, 2:14 PM in summer)
-    - cron: "14 18 * * *"
+    # Twice a day: before the early games and before the evening games.
+    # 14:44 UTC = 9:44 AM Eastern (winter) / 10:44 AM (summer), ahead of Sunday's 1 PM kickoffs.
+    # 21:44 UTC = 4:44 PM Eastern (winter) / 5:44 PM (summer), ahead of NBA tip-offs and night games.
+    - cron: "44 14 * * *"
+    - cron: "44 21 * * *"
   workflow_dispatch:
 
 permissions:
@@ -27,7 +30,7 @@ jobs:
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898182+github-actions[bot]@users.noreply.github.com"
-          git add data/board.json
+          git add data/
           if git diff --cached --quiet; then
             echo "Board unchanged."
           else

@@ -339,7 +339,8 @@ def espn_venues(league, dates):
             country = a.get("country") or ("Canada" if st in CA_PROVINCES else ("USA" if st else ""))
             if "away" in side and "home" in side:
                 out[(side["away"], side["home"])] = {"city": a.get("city", ""), "state": st,
-                                                     "country": country, "name": v.get("fullName", "")}
+                                                     "country": country, "name": v.get("fullName", ""),
+                                                     "event": str(e.get("id", ""))}
     return out
 
 
@@ -396,6 +397,32 @@ def badges(person, game, teams, venue):
     return out
 
 
+OUT_STATUSES = {"Out", "Injured Reserve", "Doubtful", "Suspension"}
+
+
+def espn_injuries(league):
+    """ESPN athlete id -> {status, type, note, returns} for everyone on the league injury report."""
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{ESPN_SPORT[league]}/{league}/injuries"
+    out = {}
+    try:
+        d = json.loads(get(url))
+    except Exception:
+        return out
+    for t in d.get("injuries", []):
+        for i in t.get("injuries", []):
+            status = i.get("status") or ""
+            if not status or status == "Active":
+                continue
+            a = i.get("athlete") or {}
+            m = re.search(r"/id/(\d+)", " ".join(l.get("href", "") for l in a.get("links", [])))
+            if not m:
+                continue
+            det = i.get("details") or {}
+            out[m.group(1)] = {"status": status, "type": det.get("type") or "",
+                               "note": i.get("shortComment") or "", "returns": det.get("returnDate") or ""}
+    return out
+
+
 def versus(career, person, game, teams):
     """Career games against today's opponent (newest first), or None if the matchup is unknown."""
     if not person or person.get("team") not in (game.get("espnAway"), game.get("espnHome")):
@@ -437,6 +464,7 @@ def build(league):
     dates = {dt.datetime.fromisoformat(g["start"].replace("Z", "+00:00")).astimezone(ET).date().isoformat()
              for g in games.values() if g.get("start")}
     venues = espn_venues(league, dates)
+    injuries = espn_injuries(league)
 
     board = {}
     skipped = 0
@@ -477,8 +505,11 @@ def build(league):
             g = games[gid]
             venue = venues.get((g.get("espnAway"), g.get("espnHome")))
             g["venue"] = venue
+            g["espnEvent"] = (venue or {}).get("event")
             person = people.get(p["player"])
             gb["players"][p["player"]] = {"name": p["player"], "team": p["team"], "props": [],
+                                          "pid": ids.get(p["player"]),
+                                          "injury": injuries.get(str(ids.get(p["player"]))),
                                           "badges": badges(person, g, teams, venue),
                                           "vs": versus(logs.get(p["player"], []), person, g, teams)}
         pl = gb["players"][p["player"]]
@@ -495,7 +526,9 @@ def build(league):
             "season": {"n": s_n, "hits": s_hits, "pct": s_pct, "avg": s_avg},
             "vegas": implied(p["over"]["odds"]) if p["over"] else None,
             "proj": proj,
-            "call": "hit" if proj >= 55 else "miss",
+            "call": ("out" if (pl["injury"] or {}).get("status") in OUT_STATUSES
+                     else "hit" if proj >= 55 else "miss"),
+            "keys": keys,
             # career vs today's opponent: shown in the player's dropdown, not used in "proj"
             "vs": {"n": len(got), "hits": vs_hits, "avg": round(sum(got) / len(got), 1) if got else None,
                    "v": vv, "hot": len(got) >= 3 and vs_hits / len(got) >= 0.6},
@@ -511,7 +544,8 @@ def build(league):
                 pl["vs"].pop("_games", None)
         for pl in players:
             pl["props"].sort(key=lambda x: -x["proj"])
-        players.sort(key=lambda pl: (-max(x["proj"] for x in pl["props"]), pl["name"]))
+        players.sort(key=lambda pl: ((pl["injury"] or {}).get("status") in OUT_STATUSES,
+                                     -max(x["proj"] for x in pl["props"]), pl["name"]))
         out_games.append({**g, "players": players})
     out_games.sort(key=lambda g: g["start"] or "")
     return {
@@ -525,27 +559,41 @@ def build(league):
 
 
 if __name__ == "__main__":
-    import os
+    sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
+    import track
     out = sys.argv[1] if len(sys.argv) > 1 else "data/board.json"
+    data_dir = os.path.dirname(out) or "."
     now = dt.datetime.now(dt.timezone.utc)
     board = {"run": now.strftime("r%Y%m%dT%H%M%S"), "createdAt": now.isoformat(timespec="seconds"),
              "leagues": {}, "games": []}
+    errors = 0
     for lg in ("nfl", "nba"):
         try:
             data = build(lg)
         except Exception as e:  # keep the other league going
             data = {"league": lg.upper(), "error": str(e), "games": []}
+        errors += bool(data.get("error"))
         n = sum(len(pl["props"]) for g in data["games"] for pl in g["players"])
         board["leagues"][lg.upper()] = {"games": len(data["games"]), "props": n,
                                         "skipped": data.get("propsSkipped"), "error": data.get("error")}
         board["games"] += [{"league": lg.upper(), **g} for g in data["games"]]
         print(f"{lg}: {len(data['games'])} games, {n} props, skipped {data.get('propsSkipped')}",
               data.get("error") or "")
-    if not board["games"]:
-        # nothing usable: keep yesterday's board instead of blanking the site
+    os.makedirs(data_dir, exist_ok=True)
+    if board["games"]:
+        with open(out, "w") as f:
+            json.dump(board, f, separators=(",", ":"))
+        print(f"Wrote {out} ({os.path.getsize(out)//1024} KB)")
+    else:
+        # nothing usable: keep the previous board instead of blanking the site
         print("No games found in either league; board left unchanged.", file=sys.stderr)
-        sys.exit(1)
-    os.makedirs(os.path.dirname(out) or ".", exist_ok=True)
-    with open(out, "w") as f:
-        json.dump(board, f, separators=(",", ":"))
-    print(f"Wrote {out} ({os.path.getsize(out)//1024} KB)")
+
+    # results tracker: save today's calls, grade finished games, rebuild the track record
+    saved = track.record_picks(board, data_dir, now)
+    graded = track.grade(data_dir, now)
+    rec = track.summarize(data_dir, now)
+    t = rec["total"]
+    print(f"Tracker: {saved} picks saved, {graded} graded, {rec['pending']} pending; "
+          f"green {t['gHit']}/{t['gN']}, red {t['rHit']}/{t['rN']}")
+    if errors == 2:
+        sys.exit(1)  # both leagues failed: make the workflow run show red
