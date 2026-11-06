@@ -1,5 +1,7 @@
 # Prop Exchange
 
+**Live board:** https://mrslythe.github.io/Prop-Exchange/
+
 A daily board of NFL and NBA player props. For every game it lists the players with props, each player's last 5 games, and whether that player trends to **hit** (green) or **miss** (red) the Vegas line.
 
 ## How it works
