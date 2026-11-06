@@ -480,6 +480,14 @@ def build(league):
              for g in games.values() if g.get("start")}
     venues = espn_venues(league, dates)
     injuries = espn_injuries(league)
+    defense = None
+    if league == "nfl":
+        try:
+            import dvp
+            defense = dvp.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+                               current_season("nfl"))
+        except Exception as e:
+            print("defense vs position unavailable:", e, file=sys.stderr)
 
     board = {}
     skipped = 0
@@ -515,6 +523,17 @@ def build(league):
         else:
             proj = l5_pct
         gid = p["event"]
+        # NFL matchup: nudge the projection by how much the opponent allows this stat to this position
+        matchup, proj_base = None, proj
+        person = people.get(p["player"])
+        if defense and person and person.get("team"):
+            g0 = games[gid]
+            if person["team"] in (g0.get("espnAway"), g0.get("espnHome")):
+                opp = g0["espnHome"] if person["team"] == g0["espnAway"] else g0["espnAway"]
+                matchup = defense.matchup(opp, defense.position(ids.get(p["player"])), keys)
+                if matchup:
+                    matchup["opp"] = (teams.get(opp) or {}).get("displayName", "")
+                    proj = max(1, min(99, proj + matchup["nudge"]))
         gb = board.setdefault(gid, {"players": {}})
         if p["player"] not in gb["players"]:
             g = games[gid]
@@ -539,7 +558,7 @@ def build(league):
             "last5": last, "hits": hits, "pct": l5_pct, "avg": avg,
             "season": {"n": s_n, "hits": s_hits, "pct": s_pct, "avg": s_avg},
             "vegas": implied(p["over"]["odds"]) if p["over"] else None,
-            "proj": proj,
+            "proj": proj, "projBase": proj_base, "matchup": matchup,
             "call": ("out" if (pl["injury"] or {}).get("status") in OUT_STATUSES
                      else "hit" if proj >= 55 else "miss"),
             "keys": keys,
@@ -558,6 +577,14 @@ def build(league):
                 pl["vs"].pop("_games", None)
         for pl in players:
             pl["props"].sort(key=lambda x: -x["proj"])
+            # the line under the name: the player's main stat for his position, else any prop with a matchup
+            main = {"QB": "Pass Yds", "RB": "Rush Yds", "WR": "Rec Yds", "TE": "Rec Yds"}
+            ms = [x for x in pl["props"] if x.get("matchup")]
+            pick = next((x for x in ms if x["stat"] == main.get(x["matchup"]["pos"])), ms[0] if ms else None)
+            pl["matchup"] = {**pick["matchup"], "stat": pick["stat"]} if pick else None
+            for x in pl["props"]:  # keep each prop's copy small; the full details live on the player
+                if x.get("matchup"):
+                    x["matchup"] = {k: x["matchup"][k] for k in ("rank", "allowed", "avg", "nudge", "tier")}
         players.sort(key=lambda pl: ((pl["injury"] or {}).get("status") in OUT_STATUSES,
                                      -max(x["proj"] for x in pl["props"]), pl["name"]))
         out_games.append({**g, "players": players})

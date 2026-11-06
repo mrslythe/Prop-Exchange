@@ -142,6 +142,10 @@ details.record[open]>summary{border-bottom:1px solid var(--rule);background:var(
 .precent{display:flex;flex-wrap:wrap;gap:6px}
 .precent span{font-size:11px;padding:2px 7px;border-radius:2px;background:var(--panel2);border:1px solid var(--rule)}
 .precent span.w{color:var(--up);border-color:var(--up)} .precent span.l{color:var(--down)}
+.dvp{display:block;margin-top:3px;font-size:12px;color:var(--muted);font-family:var(--mono);letter-spacing:0;text-transform:none}
+.dvp b{color:var(--fg);font-weight:500}
+.tier{display:inline-block;padding:0 6px;border-radius:2px;font-size:11px;font-weight:700;margin-left:6px;letter-spacing:.04em}
+.tier.tough{background:var(--down-bg);color:var(--down)} .tier.easy{background:var(--up-bg);color:var(--up)} .tier.neutral{background:var(--panel2);color:var(--muted);border:1px solid var(--rule)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px}
 .pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
 .tbl{overflow-x:auto}
@@ -215,6 +219,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
     <ul>
       <li><b>Line:</b> consensus from scoresandodds.com (midpoint of the best over and under).</li>
       <li><b>Projected %:</b> 60% season hit rate + 40% last-5 hit rate. <b>Green = 55%+</b>, red below.</li>
+      <li><b>NFL matchup:</b> what today's defense allows this season to the player's position for that stat, ranked 1 (toughest) to 32. It nudges Projected % up to 8 points either way.</li>
       <li><b>Vegas %:</b> the chance the over price implies. Projected well above it is the better play.</li>
       <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
       <li><b>Injuries:</b> ⚠️ questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
@@ -255,6 +260,14 @@ function when(iso){
   return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
 let special = false;
+const POSN = {QB: "QBs", RB: "RBs", WR: "WRs", TE: "TEs"};
+const TIER = {tough: "Tough", easy: "Easy", neutral: "Average"};
+const ord = n => n + (["th","st","nd","rd"][(n % 100 - 20) % 10] || ["th","st","nd","rd"][n % 100] || "th");
+function dvpLine(p){
+  const m = p.matchup; if (!m) return "";
+  const nick = (m.opp || "").split(" ").pop();
+  return `<span class="dvp" title="Ranked 1 (allows the least) to ${m.of} (allows the most), over ${m.games} games this season. League average: ${m.avg}.">${esc(nick)} D vs ${POSN[m.pos] || m.pos}: <b>${m.allowed} ${esc(m.stat)}/game</b> allowed · ranks ${ord(m.rank)} of ${m.of}<span class="tier ${esc(m.tier)}">${TIER[m.tier] || ""}</span></span>`;
+}
 let parlays = [], rec = null;
 const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
 function showView(){
@@ -398,7 +411,7 @@ function render(){
       const vkey = g.league + g.id + "|" + p.name, vopen = vsOpen.has(vkey);
       const hot = p.props.some(x => x.vs?.hot);
       const out = isOut(p);
-      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} of ${p.props.length} props projected to hit`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}</td></tr>
+      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} of ${p.props.length} props projected to hit`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}${dvpLine(p)}</td></tr>
       <tr class="vsrow"${vopen ? "" : " hidden"}><td colspan="8">${vopen ? vsPanel(p) : ""}</td></tr>` +
       p.props.map(x => {
         const up = x.call === "hit", se = x.season || {};
@@ -409,7 +422,7 @@ function render(){
           <td>${f1(x.avg)}<small class="sub">${x.hits}/5 · ${x.pct}%</small></td>
           <td class="chg ${se.avg > x.line ? "u" : "d"}">${se.avg ?? "—"}<small class="sub">${se.n ? `${se.hits}/${se.n} · ${se.pct}%` : "no games yet"}</small></td>
           <td class="odds">${x.vegas != null ? x.vegas + "%" : "—"}<small class="sub">o ${esc(oddsTxt(x.over))}</small></td>
-          <td class="hit ${up?"u":"d"}"><span>${up?"▲":"▼"} ${proj(x)}%</span></td></tr>`;
+          <td class="hit ${up?"u":"d"}"><span>${up?"▲":"▼"} ${proj(x)}%</span>${x.matchup ? `<small class="sub" title="Before matchup: ${x.projBase}%. Opponent ranks ${ord(x.matchup.rank)} toughest against this stat (${x.matchup.allowed}/game vs ${x.matchup.avg} league average).">${x.matchup.nudge ? (x.matchup.nudge > 0 ? "+" : "") + x.matchup.nudge + " matchup" : "matchup even"}</small>` : ""}</td></tr>`;
       }).join("");
     }).join("");
     return `<details class="game" data-key="${esc(key)}"${open ? " open" : ""}>
