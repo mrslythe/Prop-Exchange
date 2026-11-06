@@ -160,31 +160,20 @@ def espn_find(league, name):
 
 
 def espn_games(league, pid):
-    """Return played regular-season games, most recent first: [{date, opp, atVs, stats{name:value}}]."""
+    """Every regular-season and playoff game of a player's career, newest first.
+
+    Returns (games, current_season). Each game: {date, season, cur, post, opp, oppId, oppName,
+    teamId, atVs, res, stats{name: value}}.
+    """
     base = f"https://site.web.api.espn.com/apis/common/v3/sports/{ESPN_SPORT[league]}/{league}/athletes/{pid}/gamelog"
-    games = []
-    seen = set()
-    d = {}
-    for attempt in range(2):
-        url = base
-        if attempt == 1:
-            if len(games) >= 5:
-                break
-            # not enough games this season: reach back one season
-            # (ESPN names NBA seasons by end year, so 2026-27 is 2027 and last season is 2026)
-            season = d.get("requestedSeason", {}).get("year") if isinstance(d, dict) else None
-            today = dt.date.today()
-            cur = int(season) if season else (today.year + (1 if league == "nba" and today.month >= 8 else 0))
-            url = f"{base}?season={cur - 1}"
-        try:
-            d = json.loads(get(url))
-        except Exception:
-            d = {}
-            continue
+    games, seen = [], set()
+
+    def parse(d, season, cur):
         names = d.get("names") or []
         evmeta = d.get("events") or {}
         for st in d.get("seasonTypes", []):
-            if "Regular" not in st.get("displayName", "") and "Postseason" not in st.get("displayName", ""):
+            label = st.get("displayName", "")
+            if "Regular" not in label and "Postseason" not in label:
                 continue
             for cat in st.get("categories", []):
                 if cat.get("type") not in (None, "event"):
@@ -204,15 +193,35 @@ def espn_games(league, pid):
                         else:
                             vals.setdefault(n, num(v))
                     m = evmeta[eid]
+                    opp = m.get("opponent") or {}
                     games.append({
                         "date": m.get("gameDate", "")[:10],
-                        "opp": (m.get("opponent") or {}).get("abbreviation", ""),
+                        "season": season, "cur": cur, "post": "Postseason" in label,
+                        "opp": opp.get("abbreviation", ""), "oppId": str(opp.get("id", "")),
+                        "oppName": opp.get("displayName", ""),
+                        "teamId": str((m.get("team") or {}).get("id", "")),
                         "atVs": m.get("atVs", ""),
-                        "cur": attempt == 0,  # False = reached back into last season
+                        "res": " ".join(x for x in (m.get("gameResult", ""), m.get("score", "")) if x),
                         "stats": vals,
                     })
+
+    try:
+        d0 = json.loads(get(base))
+    except Exception:
+        return [], None
+    flt = next((f for f in d0.get("filters", []) if f.get("name") == "season"), {})
+    seasons = [str(o.get("value")) for o in flt.get("options", []) if o.get("value")]
+    cur = str(flt.get("value") or (seasons[0] if seasons else ""))
+    parse(d0, int(cur) if cur.isdigit() else 0, True)
+    for s in seasons:  # the rest of the career, one season at a time
+        if s == cur or not s.isdigit():
+            continue
+        try:
+            parse(json.loads(get(f"{base}?season={s}")), int(s), False)
+        except Exception:
+            continue
     games.sort(key=lambda g: g["date"], reverse=True)
-    return games
+    return games, (int(cur) if cur.isdigit() else None)
 
 
 def implied(odds):
@@ -345,21 +354,6 @@ def espn_person(league, pid):
         info["team"] = m.group(1) if m else None
     except Exception:
         pass
-    url = (f"https://site.web.api.espn.com/apis/common/v3/sports/{ESPN_SPORT[league]}/{league}"
-           f"/athletes/{pid}/gamelog?season={current_season(league) - 1}")
-    try:
-        d = json.loads(get(url))
-        for st in d.get("seasonTypes", []):
-            if "Regular" not in st.get("displayName", "") and "Postseason" not in st.get("displayName", ""):
-                continue
-            for cat in st.get("categories", []):
-                for e in cat.get("events", []):
-                    m = (d.get("events") or {}).get(e.get("eventId")) or {}
-                    tid = (m.get("team") or {}).get("id")
-                    if tid:
-                        info["lastTeams"].add(str(tid))
-    except Exception:
-        pass
     return info
 
 
@@ -402,6 +396,20 @@ def badges(person, game, teams, venue):
     return out
 
 
+def versus(career, person, game, teams):
+    """Career games against today's opponent (newest first), or None if the matchup is unknown."""
+    if not person or person.get("team") not in (game.get("espnAway"), game.get("espnHome")):
+        return None
+    opp = game["espnHome"] if person["team"] == game["espnAway"] else game["espnAway"]
+    vg = [g for g in career if g["oppId"] == opp]
+    return {
+        "opp": (teams.get(opp) or {}).get("displayName", ""),
+        "n": len(vg),
+        "games": [{"d": g["date"], "p": g["post"], "a": g["atVs"], "o": g["opp"], "r": g["res"]} for g in vg],
+        "_games": vg,  # used while building props, dropped before writing
+    }
+
+
 def build(league):
     games = parse_games(league)
     props = []
@@ -413,10 +421,14 @@ def build(league):
 
     with cf.ThreadPoolExecutor(8) as ex:
         ids = dict(zip(names, ex.map(lambda n: espn_find(league, n), names)))
-    with cf.ThreadPoolExecutor(8) as ex:
-        logs = dict(zip(names, ex.map(lambda n: espn_games(league, ids[n]) if ids[n] else [], names)))
+    with cf.ThreadPoolExecutor(12) as ex:
+        careers = dict(zip(names, ex.map(lambda n: espn_games(league, ids[n]) if ids[n] else ([], None), names)))
+    logs = {n: c[0] for n, c in careers.items()}
     with cf.ThreadPoolExecutor(8) as ex:
         people = dict(zip(names, ex.map(lambda n: espn_person(league, ids[n]) if ids[n] else None, names)))
+    for n, (career, cur) in careers.items():
+        if people.get(n) and cur:
+            people[n]["lastTeams"] = {g["teamId"] for g in career if g["season"] == cur - 1 and g["teamId"]}
 
     teams = espn_teams(league)
     for g in games.values():
@@ -465,9 +477,18 @@ def build(league):
             g = games[gid]
             venue = venues.get((g.get("espnAway"), g.get("espnHome")))
             g["venue"] = venue
+            person = people.get(p["player"])
             gb["players"][p["player"]] = {"name": p["player"], "team": p["team"], "props": [],
-                                          "badges": badges(people.get(p["player"]), g, teams, venue)}
+                                          "badges": badges(person, g, teams, venue),
+                                          "vs": versus(logs.get(p["player"], []), person, g, teams)}
         pl = gb["players"][p["player"]]
+        vs_games = pl["vs"]["_games"] if pl["vs"] else []
+        vv = []
+        for vg in vs_games:
+            xs = [vg["stats"].get(k) for k in keys]
+            vv.append(None if any(x is None for x in xs) else round(sum(xs), 1))
+        got = [x for x in vv if x is not None]
+        vs_hits = sum(1 for x in got if x > line)
         pl["props"].append({
             "stat": label, "line": line, "over": p["over"], "under": p["under"],
             "last5": last, "hits": hits, "pct": l5_pct, "avg": avg,
@@ -475,6 +496,9 @@ def build(league):
             "vegas": implied(p["over"]["odds"]) if p["over"] else None,
             "proj": proj,
             "call": "hit" if proj >= 55 else "miss",
+            # career vs today's opponent: shown in the player's dropdown, not used in "proj"
+            "vs": {"n": len(got), "hits": vs_hits, "avg": round(sum(got) / len(got), 1) if got else None,
+                   "v": vv, "hot": len(got) >= 3 and vs_hits / len(got) >= 0.6},
         })
 
     out_games = []
@@ -483,6 +507,9 @@ def build(league):
             continue
         players = list(board[gid]["players"].values())
         for pl in players:
+            if pl["vs"]:
+                pl["vs"].pop("_games", None)
+        for pl in players:
             pl["props"].sort(key=lambda x: -x["proj"])
         players.sort(key=lambda pl: (-max(x["proj"] for x in pl["props"]), pl["name"]))
         out_games.append({**g, "players": players})
@@ -490,7 +517,7 @@ def build(league):
     return {
         "league": league.upper(),
         "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games and season stats: ESPN game logs.",
+        "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games, season and career stats: ESPN game logs.",
         "rule": "Projected % = 60% season hit rate + 40% last-5 hit rate against the consensus line (midpoint of best over and best under). Green = 55% or higher.",
         "propsSeen": len(props), "propsSkipped": skipped,
         "games": out_games,

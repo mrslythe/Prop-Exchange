@@ -10,6 +10,7 @@ A daily board of NFL and NBA player props. For every game it lists the players w
 - **Last 5 games and season stats** come from ESPN's public game logs (every game the player has played this season).
 - **Projected %** = 60% × season hit rate + 40% × last-5 hit rate, both against the same line. With fewer than 5 games this season it leans on the last 5, which reach back into last season. 55% or higher is green; otherwise red.
 - **Vegas %** is the chance implied by the sportsbook's over price, shown for comparison.
+- **Career vs today's opponent**: tap a player's name to open every regular-season and playoff game of his career against that day's opponent, measured against today's lines (games, how many went over, average, each game's number). 🔥 marks a prop he has cleared in at least 60% of 3+ games against that team. Reference only: it does not change the Projected %.
 - **Badges** (from ESPN player records): 🎂 the game is on the player's birthday · 😤 revenge game, the opponent is a team he played for last season · 🏠 hometown game, the arena is within 35 miles of his birthplace · 📍 home-state (or home-country) game. Distances use the US Census place list in `data/us_places.tsv`.
 - Props for players with fewer than 5 games this season are left out.
 

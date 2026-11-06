@@ -63,6 +63,24 @@ details[open] .caret{transform:rotate(90deg)}
 .badge.birthday{border-color:#d58bd9;color:#f1c6f3}
 .badge.revenge{border-color:var(--down);color:#ffb3b4}
 .badge.hometown{border-color:var(--amber);color:#ffd88f}
+.pbtn{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.pbtn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.pbtn .car{color:var(--amber);font-size:10px;transition:transform .15s;display:inline-block}
+.pbtn[aria-expanded="true"] .car{transform:rotate(90deg)}
+.pbtn:hover .pn{color:var(--amber)}
+tr.vsrow td{background:var(--panel2);padding:12px 14px 14px 22px;border-bottom:1px solid var(--rule);white-space:normal;text-align:left}
+.vs h4{margin:0 0 8px;font-family:var(--cond);font-size:16px;letter-spacing:.06em;text-transform:uppercase;color:var(--amber);font-weight:700}
+.vs h4 small{color:var(--muted);font-family:var(--mono);text-transform:none;letter-spacing:0;font-size:12px;font-weight:400;margin-left:8px}
+.vs table{min-width:0;width:auto}
+.vs th,.vs td{padding:4px 10px;border-bottom:1px solid var(--grid);text-align:right}
+.vs th:first-child,.vs td:first-child{text-align:left;padding-left:0}
+.vs td:last-child{white-space:normal;min-width:180px}
+.vs .vals{display:flex;flex-wrap:wrap;gap:3px;justify-content:flex-start}
+.vs .vals i{font-style:normal;min-width:34px;padding:1px 4px;text-align:center;border-radius:2px;font-size:11px}
+.vs .vals i.h{background:var(--up-bg);color:var(--up)} .vs .vals i.m{background:var(--down-bg);color:var(--down)}
+.vs .glist{margin-top:10px;color:var(--muted);font-size:12px;display:flex;flex-wrap:wrap;gap:4px 14px}
+.vs .glist b{color:var(--fg);font-weight:500}
+.vs .note{color:var(--muted);font-size:12px;margin:8px 0 0}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px}
 .pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
 .tbl{overflow-x:auto}
@@ -124,7 +142,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
     <div class="empty"><b>Loading today's board</b>Games, players and their last five games appear here after each daily update.</div>
   </div>
   <p class="foot">
-    <b>How a call is made.</b> Lines come from scoresandodds.com. The line shown is the consensus: the midpoint of the best over and best under on the board. Stats come from ESPN game logs. <b>Last 5</b> shows the player's five most recent games, newest on the right, green when the game went over the line. <b>Season</b> is every game this season against the same line. <b>Projected</b> blends the two: 60% season hit rate plus 40% last-5 hit rate, so a hot or cold week counts without outweighing the whole season. Early in a season, with fewer than 5 games played, it leans more on the last 5, which reach back into last season. <b>Green means projected 55% or higher</b>; red means lower. <b>Vegas %</b> is the chance the sportsbook's over price implies (it includes their cut), so a projection well above it is the more interesting play. <b>Badges:</b> 🎂 the game falls on the player's birthday (by Eastern time). 😤 the opponent is a team the player played for last season. 🏠 the arena is within 35 miles of where the player was born. 📍 the game is in the player's birth state (or birth country, outside the US). Birthplaces come from ESPN and show where a player was born, not always where he grew up. These numbers ignore injuries, matchups and minutes, so treat them as one input, not a sure thing.
+    <b>How a call is made.</b> Lines come from scoresandodds.com. The line shown is the consensus: the midpoint of the best over and best under on the board. Stats come from ESPN game logs. <b>Last 5</b> shows the player's five most recent games, newest on the right, green when the game went over the line. <b>Season</b> is every game this season against the same line. <b>Projected</b> blends the two: 60% season hit rate plus 40% last-5 hit rate, so a hot or cold week counts without outweighing the whole season. Early in a season, with fewer than 5 games played, it leans more on the last 5, which reach back into last season. <b>Green means projected 55% or higher</b>; red means lower. <b>Vegas %</b> is the chance the sportsbook's over price implies (it includes their cut), so a projection well above it is the more interesting play. <b>Tap a player's name</b> to see every regular-season and playoff game of his career against today's opponent, measured against today's lines. 🔥 marks a prop he has gone over in at least 60% of 3 or more games against this team. This is for reference only and does not change the Projected %. <b>Badges:</b> 🎂 the game falls on the player's birthday (by Eastern time). 😤 the opponent is a team the player played for last season. 🏠 the arena is within 35 miles of where the player was born. 📍 the game is in the player's birth state (or birth country, outside the US). Birthplaces come from ESPN and show where a player was born, not always where he grew up. These numbers ignore injuries, matchups and minutes, so treat them as one input, not a sure thing.
   </p>
 </main>
 
@@ -150,6 +168,26 @@ function when(iso){
   return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
 let special = false;
+const vsOpen = new Set();
+const fmtD = d => new Date(d + "T12:00:00").toLocaleDateString([], {month:"short", day:"numeric", year:"numeric"});
+function vsPanel(p){
+  const v = p.vs;
+  if (!v) return `<div class="vs"><p class="note">Past matchups are not available for this player.</p></div>`;
+  if (!v.n) return `<div class="vs"><h4>Career vs ${esc(v.opp)}</h4><p class="note">No regular-season or playoff games against the ${esc(v.opp)} yet.</p></div>`;
+  const first = v.games[v.games.length-1].d.slice(0,4);
+  const rows = p.props.map(x => {
+    const s = x.vs || {};
+    if (!s.n) return `<tr><td>${esc(x.stat)}</td><td>${x.line}</td><td colspan="4" style="text-align:left;color:var(--muted)">No ${esc(x.stat)} recorded in past games vs this team</td></tr>`;
+    const chips = (s.v||[]).map((val,i) => val == null ? "" : `<i class="${val > x.line ? "h" : "m"}" title="${esc(fmtD(v.games[i].d))}">${f1(val)}</i>`).join("");
+    return `<tr><td>${esc(x.stat)}${s.hot ? " 🔥" : ""}</td><td>${x.line}</td><td>${s.n}</td><td class="chg ${s.hits/s.n >= .5 ? "u" : "d"}">${s.hits}/${s.n} · ${Math.round(100*s.hits/s.n)}%</td><td>${s.avg}</td><td><span class="vals">${chips}</span></td></tr>`;
+  }).join("");
+  const glist = v.games.slice(0, 12).map(g => `<span><b>${esc(fmtD(g.d))}</b> ${esc(g.a)} ${esc(g.o)} ${esc(g.r)}${g.p ? " (playoffs)" : ""}</span>`).join("");
+  return `<div class="vs"><h4>Career vs ${esc(v.opp)}<small>${v.n} game${v.n>1?"s":""} since ${first}</small></h4>
+    <div class="tbl"><table><thead><tr><th>Stat</th><th>Today's line</th><th>Games</th><th>Over</th><th>Avg</th><th>Each game (newest first)</th></tr></thead><tbody>${rows}</tbody></table></div>
+    <div class="glist">${glist}${v.n > 12 ? `<span>+ ${v.n-12} earlier</span>` : ""}</div>
+    ${v.n < 3 ? `<p class="note">Only ${v.n} game${v.n>1?"s":""} against this team, so read these numbers loosely.</p>` : ""}
+    <p class="note">For reference only. Not part of the Projected %.</p></div>`;
+}
 function keep(p){
   if (show === "hit" && p.call !== "hit") return false;
   if (show === "miss" && p.call !== "miss") return false;
@@ -213,7 +251,10 @@ function render(){
     const spread = a.spread?.v ? `${esc(a.abbr || a.name)} ${esc(a.spread.v)}` : "";
     const rows = players.map(p => {
       const pu = p.props.filter(x => x.call === "hit").length;
-      return `<tr class="player"><td colspan="8"><span class="pn">${esc(p.name)}</span><span class="tm">${esc(p.team||"")}</span><span class="ps">${pu} of ${p.props.length} props projected to hit</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}</td></tr>` +
+      const vkey = g.league + g.id + "|" + p.name, vopen = vsOpen.has(vkey);
+      const hot = p.props.some(x => x.vs?.hot);
+      return `<tr class="player"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span><span class="ps">${pu} of ${p.props.length} props projected to hit</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}</td></tr>
+      <tr class="vsrow"${vopen ? "" : " hidden"}><td colspan="8">${vopen ? vsPanel(p) : ""}</td></tr>` +
       p.props.map(x => {
         const up = x.call === "hit", se = x.season || {};
         const cells = [...x.last5].reverse().map((v, i, arr) =>
@@ -240,6 +281,17 @@ function render(){
         : `<div class="empty" style="margin:12px;border-color:var(--grid)">No props in this game match your filters.</div>`}</div>
     </details>`;
   }).join("");
+  board.querySelectorAll(".pbtn").forEach(b => b.addEventListener("click", () => {
+    const key = b.dataset.vs, row = b.closest("tr").nextElementSibling, open = !vsOpen.has(key);
+    open ? vsOpen.add(key) : vsOpen.delete(key);
+    b.setAttribute("aria-expanded", String(open));
+    if (open) {
+      const cut = key.indexOf("|"), gk = key.slice(0, cut), name = key.slice(cut + 1);
+      const gm = games.find(x => x.league + x.id === gk), pl = gm?.players.find(x => x.name === name);
+      row.firstElementChild.innerHTML = pl ? vsPanel(pl) : "";
+    }
+    row.hidden = !open;
+  }));
   board.querySelectorAll("details.game").forEach(d => d.addEventListener("toggle", () => {
     d.open ? openState.add(d.dataset.key) : openState.delete(d.dataset.key);
   }));
