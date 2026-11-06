@@ -205,10 +205,22 @@ def espn_games(league, pid):
                         "date": m.get("gameDate", "")[:10],
                         "opp": (m.get("opponent") or {}).get("abbreviation", ""),
                         "atVs": m.get("atVs", ""),
+                        "cur": attempt == 0,  # False = reached back into last season
                         "stats": vals,
                     })
     games.sort(key=lambda g: g["date"], reverse=True)
     return games
+
+
+def implied(odds):
+    """Vegas' implied chance of the over from American odds (vig included), e.g. -110 -> 52."""
+    o = str(odds or "").strip().lower()
+    if o in ("even", "ev", "+100", "100"):
+        return 50
+    v = num(o.replace("+", ""))
+    if v is None or v == 0:
+        return None
+    return round(100 * (-v / (-v + 100) if v < 0 else 100 / (v + 100)))
 
 
 def build(league):
@@ -229,26 +241,45 @@ def build(league):
     skipped = 0
     for p in props:
         label, keys = PROPS[league][p["slug"]]
-        last = []
+        played = []  # every game with this stat, newest first
         for g in logs.get(p["player"], []):
             vs = [g["stats"].get(k) for k in keys]
             if any(v is None for v in vs):
                 continue
-            last.append({"v": round(sum(vs), 1), "date": g["date"], "opp": g["opp"], "atVs": g["atVs"]})
-            if len(last) == 5:
-                break
+            played.append({"v": round(sum(vs), 1), "date": g["date"], "opp": g["opp"],
+                           "atVs": g["atVs"], "cur": g.get("cur", True)})
+        last = [{k: x[k] for k in ("v", "date", "opp", "atVs")} for x in played[:5]]
         if len(last) < 5:
             skipped += 1
             continue
-        hits = sum(1 for x in last if x["v"] > p["line"])
+        line = p["line"]
+        hits = sum(1 for x in last if x["v"] > line)
         avg = round(sum(x["v"] for x in last) / 5, 1)
+        season = [x for x in played if x["cur"]]
+        s_n = len(season)
+        s_hits = sum(1 for x in season if x["v"] > line)
+        s_pct = round(100 * s_hits / s_n) if s_n else None
+        s_avg = round(sum(x["v"] for x in season) / s_n, 1) if s_n else None
+        l5_pct = hits * 20
+        # Projected %: the season hit rate carries 60%, the last 5 carry 40% (recent form).
+        # With fewer than 5 games this season, lean on the last 5, which reach into last season.
+        if s_n >= 5:
+            proj = round(0.6 * s_pct + 0.4 * l5_pct)
+        elif s_n:
+            w = 0.6 * s_n / 5
+            proj = round(w * s_pct + (1 - w) * l5_pct)
+        else:
+            proj = l5_pct
         gid = p["event"]
         gb = board.setdefault(gid, {"players": {}})
         pl = gb["players"].setdefault(p["player"], {"name": p["player"], "team": p["team"], "props": []})
         pl["props"].append({
-            "stat": label, "line": p["line"], "over": p["over"], "under": p["under"],
-            "last5": last, "hits": hits, "pct": hits * 20, "avg": avg,
-            "call": "hit" if hits >= 3 else "miss",
+            "stat": label, "line": line, "over": p["over"], "under": p["under"],
+            "last5": last, "hits": hits, "pct": l5_pct, "avg": avg,
+            "season": {"n": s_n, "hits": s_hits, "pct": s_pct, "avg": s_avg},
+            "vegas": implied(p["over"]["odds"]) if p["over"] else None,
+            "proj": proj,
+            "call": "hit" if proj >= 55 else "miss",
         })
 
     out_games = []
@@ -257,15 +288,15 @@ def build(league):
             continue
         players = list(board[gid]["players"].values())
         for pl in players:
-            pl["props"].sort(key=lambda x: -x["pct"])
-        players.sort(key=lambda pl: (-max(x["pct"] for x in pl["props"]), pl["name"]))
+            pl["props"].sort(key=lambda x: -x["proj"])
+        players.sort(key=lambda pl: (-max(x["proj"] for x in pl["props"]), pl["name"]))
         out_games.append({**g, "players": players})
     out_games.sort(key=lambda g: g["start"] or "")
     return {
         "league": league.upper(),
         "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
-        "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games: ESPN game logs.",
-        "rule": "Hit % = share of the last 5 games above the consensus line (midpoint of best over and best under). Green = 3 or more of 5.",
+        "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games and season stats: ESPN game logs.",
+        "rule": "Projected % = 60% season hit rate + 40% last-5 hit rate against the consensus line (midpoint of best over and best under). Green = 55% or higher.",
         "propsSeen": len(props), "propsSkipped": skipped,
         "games": out_games,
     }

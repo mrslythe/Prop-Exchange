@@ -2,13 +2,14 @@
 
 **Live board:** https://mrslythe.github.io/Prop-Exchange/
 
-A daily board of NFL and NBA player props. For every game it lists the players with props, each player's last 5 games, and whether that player trends to **hit** (green) or **miss** (red) the Vegas line.
+A daily board of NFL and NBA player props. For every game it lists the players with props, each player's last 5 games and full-season numbers, and whether that player is projected to **hit** (green) or **miss** (red) the Vegas line.
 
 ## How it works
 
 - **Lines** come from [scoresandodds.com](https://www.scoresandodds.com) (game lines from `/nfl` and `/nba`, player props from `/nfl/props/*` and `/nba/props/*`). The line used is the midpoint of the best over and best under, which sits close to the consensus.
-- **Last 5 games** come from ESPN's public game logs.
-- **Hit %** is the share of the last 5 games that went over the line. 3 or more of 5 is green; otherwise red.
+- **Last 5 games and season stats** come from ESPN's public game logs (every game the player has played this season).
+- **Projected %** = 60% × season hit rate + 40% × last-5 hit rate, both against the same line. With fewer than 5 games this season it leans on the last 5, which reach back into last season. 55% or higher is green; otherwise red.
+- **Vegas %** is the chance implied by the sportsbook's over price, shown for comparison.
 - Props for players with fewer than 5 games this season are left out.
 
 Five games is a small sample and ignores injuries, matchups and minutes. Treat it as one input.
