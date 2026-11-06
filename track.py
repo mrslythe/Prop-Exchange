@@ -126,6 +126,32 @@ def _parlay_results(data_dir):
     return out
 
 
+def _write_players(data_dir, now, days=30, keep=15):
+    """data/players.json: each player's graded props from the last 30 days, for the Blue Chips tab."""
+    since = (now.astimezone(ET).date() - dt.timedelta(days=days)).isoformat()
+    out = {}
+    for path in sorted(glob.glob(f"{data_dir}/picks/*.json")):
+        day = os.path.basename(path)[:-5]
+        if day < since:
+            continue
+        for p in _load(path)["picks"].values():
+            if p.get("r") not in ("over", "under"):
+                continue
+            k = f"{p['lg']}|{p['n']}"
+            e = out.setdefault(k, {"n": 0, "over": 0, "gN": 0, "gHit": 0, "recent": []})
+            e["n"] += 1
+            e["over"] += p["r"] == "over"
+            if p["call"] == "hit":
+                e["gN"] += 1
+                e["gHit"] += p["r"] == "over"
+            e["recent"].append({"d": day, "s": p["s"], "line": p["line"], "a": p["a"], "r": p["r"], "call": p["call"]})
+    for e in out.values():
+        e["recent"] = sorted(e["recent"], key=lambda x: x["d"], reverse=True)[:keep]
+    with open(f"{data_dir}/players.json", "w") as f:
+        json.dump({"updatedAt": now.isoformat(timespec="seconds"), "days": days, "players": out},
+                  f, separators=(",", ":"))
+
+
 def _season_log(league, pid):
     """eventId -> stats for a player's current season (regular season and playoffs)."""
     url = (f"https://site.web.api.espn.com/apis/common/v3/sports/{ESPN_SPORT[league]}/{league}"
@@ -251,6 +277,7 @@ def summarize(data_dir, now):
         rec["latest"] = {"d": day, "picks": [
             {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"],
              "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in greens]}
+    _write_players(data_dir, now)
     pars = _parlay_results(data_dir)
     done = [p for p in pars if p["res"] in ("won", "lost")]
     rec["parlays"] = {

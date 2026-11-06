@@ -146,6 +146,46 @@ details.record[open]>summary{border-bottom:1px solid var(--rule);background:var(
 .dvp b{color:var(--fg);font-weight:500}
 .tier{display:inline-block;padding:0 5px;border-radius:2px;font-size:9px;font-weight:700;margin-right:6px;letter-spacing:.04em}
 .tier.tough{background:var(--down-bg);color:var(--down)} .tier.easy{background:var(--up-bg);color:var(--up)} .tier.neutral{background:var(--panel2);color:var(--muted);border:1px solid var(--rule)}
+.star{all:unset;cursor:pointer;color:var(--muted);font-size:15px;line-height:1;margin-right:6px;vertical-align:middle}
+.star.on{color:var(--amber)}
+.star:hover{color:var(--amber)}
+.star:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.bcbar{display:flex;flex-wrap:wrap;gap:8px 16px;align-items:center;justify-content:space-between}
+.bcform{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.bcform input[type=email],.bcform input[type=text]{width:260px;max-width:100%;padding:8px 10px;font-size:13px}
+.bcform select{padding:8px}
+.bbtn{font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;padding:8px 14px;border-radius:3px;cursor:pointer;border:1px solid var(--amber);background:var(--amber);color:#111}
+.bbtn.ghost{background:transparent;color:var(--fg);border-color:var(--rule)}
+.bbtn:disabled{opacity:.5;cursor:default}
+.bbtn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
+.bcmsg{font-size:12px;color:var(--muted);margin:0}
+.bcmsg.ok{color:var(--up)} .bcmsg.err{color:var(--down)}
+.bcwho{color:var(--muted);font-size:12px}
+.bcwho b{color:var(--fg);font-weight:500}
+.bcsign{background:var(--panel);border:1px solid var(--grid);border-radius:3px;padding:18px;display:grid;gap:10px;max-width:560px}
+.bcsign h3{margin:0;font-family:var(--cond);font-size:22px;letter-spacing:.05em;text-transform:uppercase;color:var(--amber)}
+.bcgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(340px,1fr))}
+.bccard{background:var(--panel);border:1px solid var(--grid);border-radius:3px;min-width:0;display:grid;align-content:start}
+.bccard header{display:flex;justify-content:space-between;gap:10px;align-items:start;padding:10px 14px;border-bottom:1px solid var(--rule);background:var(--panel2)}
+.bccard h3{margin:0;font-family:var(--cond);font-size:20px;letter-spacing:.05em;text-transform:uppercase;line-height:1.1}
+.bccard h3 small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.06em;color:var(--muted);font-weight:500;text-transform:none}
+.bcx{all:unset;cursor:pointer;color:var(--muted);font-size:12px;padding:2px 6px;border:1px solid var(--rule);border-radius:3px}
+.bcx:hover{color:var(--down);border-color:var(--down)}
+.bcx:focus-visible{outline:2px solid var(--amber)}
+.bcbody{padding:8px 14px 12px;display:grid;gap:8px}
+.bcbody .tbl table{min-width:0}
+.bcbody td,.bcbody th{padding:4px 6px}
+.bcsec{font-family:var(--cond);font-size:13px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:600;margin:4px 0 0}
+.bccard .l5{gap:2px}
+.bccard .l5 i{min-width:24px;padding:1px 2px;font-size:11px}
+.bccard td.hit{min-width:0;font-size:12px}
+.bccard td.hit span{min-width:0;padding:1px 6px}
+.bccard td,.bccard th{white-space:nowrap;padding:4px 4px}
+.bccard td:first-child{white-space:normal}
+.bcgrid{grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr))}
+.bchist{display:flex;flex-wrap:wrap;gap:4px}
+.bchist span{font-size:11px;padding:1px 6px;border-radius:2px;border:1px solid var(--rule)}
+.bchist span.o{color:var(--up);border-color:var(--up)} .bchist span.u{color:var(--down)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px}
 .pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
 .tbl{overflow-x:auto}
@@ -206,7 +246,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 </header>
 
 <main class="gut">
-  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penalty-stocks" id="tabPenalty">Penalty Stocks</a></nav>
+  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penalty-stocks" id="tabPenalty">Penalty Stocks</a><a href="#blue-chips" id="tabBlue">Blue Chips</a></nav>
   <div id="viewBoard" style="display:grid;gap:12px">
   <div class="legend" aria-label="Icon key"><span>🎂 Birthday today</span><span>😤 Revenge game: faces last season's team</span><span>🏠 Hometown: born within 35 miles of the arena</span><span>📍 Home state</span></div>
   <details class="record" id="record"><summary><span class="rtitle">Track record</span><span class="rstat">Loading results…</span></summary><div id="recordBody"></div></details>
@@ -224,6 +264,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
       <li><b>Injuries:</b> ⚠️ questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
       <li><b>Penalty Stocks tab:</b> five parlays per sport from the top green calls, with links to build them on Hard Rock or PrizePicks.</li>
+      <li><b>Blue Chips tab:</b> sign in with an emailed link, save the players you bet on (or tap ☆ on the board), and follow their props and recent results.</li>
       <li><b>Track record:</b> every call is graded after the game, so you can see how often green and red calls are right.</li>
       <li><b>Badges:</b> 🎂 birthday · 😤 faces last season's team · 🏠 born within 35 miles · 📍 home state.</li>
       <li>Stats from ESPN. Ignores injuries and matchups, so treat it as one input.</li>
@@ -236,8 +277,14 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
     <div class="pgrid" id="pgrid"><div class="empty"><b>Loading parlays</b>The parlays appear here after the board loads.</div></div>
     <p class="pnote"><b>Building it in the app:</b> "Hard Rock" and "PrizePicks" open their site or app; add the picks yourself. "Copy picks" puts the legs on your clipboard. Payouts use the best over price across sportsbooks, so Hard Rock's price can differ, and PrizePicks uses its own lines and payouts and may not offer every prop. <b>Combined chance</b> multiplies each leg's Projected %, so it assumes the legs are independent; same-game legs tend to win or lose together. For entertainment only. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
   </section>
+  <section id="viewBlue" hidden style="display:grid;gap:14px">
+    <p class="pnote"><b>Blue Chips</b> are the players you usually bet on. Save them here, or tap ☆ next to any name on the board, and see their props today and how the board's calls on them have done lately.</p>
+    <div id="bcTop"></div>
+    <div id="bcList"></div>
+  </section>
 </main>
 
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.min.js"></script>
 <script>
 const $ = id => document.getElementById(id);
 let league = "ALL", show = "all", statF = "", q = "";
@@ -269,13 +316,129 @@ function dvpLine(p){
   return `<span class="dvp" title="Ranked 1 (allows the least) to ${m.of} (allows the most), over ${m.games} games this season. League average: ${m.avg}."><span class="tier ${esc(m.tier)}">${TIER[m.tier] || ""}</span>${esc(nick)} D vs ${POSN[m.pos] || m.pos}: <b>${m.allowed} ${esc(m.stat)}/game</b> allowed · ranks ${ord(m.rank)} of ${m.of}</span>`;
 }
 let parlays = [], rec = null;
+// Accounts: Supabase (sign in with an emailed link). The key below is the public browser key; the
+// database only lets each signed-in person read, add and remove their own Blue Chips.
+const SB_URL = "https://bcckcwbglnoghvcpqltl.supabase.co";
+const SB_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImJjY2tjd2JnbG5vZ2h2Y3BxbHRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQwMDY2NDMsImV4cCI6MjEwOTU4MjY0M30.e13jgLZ9NDOcsst3n1_ePfE9p_9dn4eo-WbCWiNcbwY";
+let sb = null;
+try { sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null; } catch (e) { sb = null; }
+let user = null, chips = [], chipsLoaded = false, playerHist = null, bcMsg = "", bcMsgKind = "";
+const chipKey = (lg, name) => lg + "|" + name;
+const isChip = (lg, name) => chips.some(c => c.league === lg && c.player === name);
+function lsDel(k){try{localStorage.removeItem(k)}catch(e){}}
+async function loadChips(){
+  if (!sb || !user) { chips = []; chipsLoaded = true; return; }
+  const { data, error } = await sb.from("blue_chips").select("id,league,player,created_at").order("created_at", {ascending: true});
+  chips = error ? [] : data; chipsLoaded = true;
+  if (error) { bcMsg = "Your Blue Chips could not be loaded. Refresh to try again."; bcMsgKind = "err"; }
+}
+async function addChip(league, player){
+  player = (player || "").trim();
+  if (!player) { bcMsg = "Type a player's name first."; bcMsgKind = "err"; return renderBlue(); }
+  if (isChip(league, player)) { bcMsg = `${player} is already in your Blue Chips.`; bcMsgKind = ""; return renderBlue(); }
+  const { data, error } = await sb.from("blue_chips").insert({league, player}).select("id,league,player,created_at").single();
+  if (error) { bcMsg = /50/.test(error.message) ? "Blue Chips holds up to 50 players. Remove one to add another." : "Could not add that player. Try again."; bcMsgKind = "err"; }
+  else { chips.push(data); bcMsg = `Added ${player}.`; bcMsgKind = "ok"; }
+  renderBlue(); render();
+}
+async function removeChip(id){
+  const c = chips.find(x => x.id === id);
+  const { error } = await sb.from("blue_chips").delete().eq("id", id);
+  if (error) { bcMsg = "Could not remove that player. Try again."; bcMsgKind = "err"; }
+  else { chips = chips.filter(x => x.id !== id); bcMsg = c ? `Removed ${c.player}.` : ""; bcMsgKind = ""; }
+  renderBlue(); render();
+}
+async function toggleStar(lg, name){
+  if (!user) { bcMsg = `Sign in to save ${name} to your Blue Chips.`; bcMsgKind = ""; location.hash = "#blue-chips"; renderBlue(); return; }
+  const c = chips.find(x => x.league === lg && x.player === name);
+  if (c) await removeChip(c.id); else await addChip(lg, name);
+}
+function findPlayer(lg, name){
+  const n = name.toLowerCase();
+  for (const g of games) { if (g.league !== lg) continue; const p = g.players.find(x => x.name.toLowerCase() === n); if (p) return {g, p}; }
+  return null;
+}
+function chipCard(c){
+  const hit = findPlayer(c.league, c.player), p = hit?.p, g = hit?.g;
+  const h = playerHist?.players?.[chipKey(c.league, c.player)];
+  let today;
+  if (!hit) today = `<p class="bcmsg">Not on the board right now. His props show up here when Vegas posts them for his next game.</p>`;
+  else {
+    const a = g.teams?.away || {}, hm = g.teams?.home || {};
+    const rows = p.props.map(x => {
+      if (x.call === "out") return `<tr><td>${esc(x.stat)}</td><td>${x.line}</td><td colspan="2" style="text-align:left;color:var(--muted)">No call: ${esc(p.injury?.status || "out")}</td></tr>`;
+      const cells = [...x.last5].reverse().map(v => `<i class="${v.v > x.line ? "h" : "m"}">${f1(v.v)}</i>`).join("");
+      const up = x.call === "hit";
+      return `<tr><td>${esc(x.stat)}</td><td>${x.line}</td><td><span class="l5">${cells}</span></td><td class="hit ${up ? "u" : "d"}"><span>${up ? "▲" : "▼"} ${proj(x)}%</span></td></tr>`;
+    }).join("");
+    today = `<div class="bcwho">${esc(a.name)} @ ${esc(hm.name)} · ${esc(when(g.start))}</div>${injTag(p) ? `<div>${injTag(p)}</div>` : ""}${dvpLine(p)}
+      ${(p.badges||[]).length ? `<div>${p.badges.map(bd => `<span class="badge ${esc(bd.kind)}" style="margin-left:0;margin-right:6px">${bd.icon} ${esc(bd.text)}</span>`).join("")}</div>` : ""}
+      <div class="tbl"><table><thead><tr><th>Stat</th><th>Line</th><th>Last 5</th><th>Proj</th></tr></thead><tbody>${rows}</tbody></table></div>`;
+  }
+  const hist = h ? `<div class="bcsec">Last ${playerHist.days} days</div>
+      <div class="bcwho">His props went over <b>${h.over} of ${h.n}</b> (${Math.round(100*h.over/h.n)}%)${h.gN ? ` · green calls hit <b>${h.gHit} of ${h.gN}</b>` : ""}</div>
+      <div class="bchist">${h.recent.map(r => `<span class="${r.r === "over" ? "o" : "u"}" title="${esc(fmtD(r.d))}">${esc(r.s)} ${r.a} vs ${r.line} ${r.r === "over" ? "✓" : "✗"}</span>`).join("")}</div>`
+    : `<div class="bcsec">Results</div><p class="bcmsg">No graded props for him yet. They appear here after his games.</p>`;
+  return `<article class="bccard"><header><h3><small>${esc(c.league)}${p?.team ? " · " + esc(p.team) : ""}</small>${esc(c.player)}</h3><button type="button" class="bcx" data-unchip="${esc(c.id)}" aria-label="Remove ${esc(c.player)}">Remove</button></header>
+    <div class="bcbody">${today}${hist}</div></article>`;
+}
+function renderBlue(){
+  const top = $("bcTop"), list = $("bcList");
+  const msg = bcMsg ? `<p class="bcmsg ${bcMsgKind}" role="status">${esc(bcMsg)}</p>` : "";
+  if (!sb) { top.innerHTML = `<p class="bcmsg err">Sign-in is unavailable right now. Refresh the page to try again.</p>`; list.innerHTML = ""; return; }
+  if (!user) {
+    top.innerHTML = `<form class="bcsign" id="bcSignForm"><h3>Sign in to save your Blue Chips</h3>
+      <p class="bcmsg">Enter your email and we'll send you a sign-in link. No password needed.</p>
+      <div class="bcform"><input type="email" id="bcEmail" required autocomplete="email" placeholder="you@example.com" aria-label="Email"><button class="bbtn" type="submit" id="bcSend">Email me a link</button></div>${msg}</form>`;
+    list.innerHTML = "";
+    $("bcSignForm").addEventListener("submit", async e => {
+      e.preventDefault();
+      const email = $("bcEmail").value.trim(); if (!email) return;
+      $("bcSend").disabled = true;
+      try { localStorage.setItem("pex.afterLogin", "1"); } catch (_) {}
+      const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+      if (error) { bcMsg = /rate|limit|seconds/i.test(error.message) ? "Too many sign-in emails just now. Wait a minute and try again." : "That email could not be sent. Check the address and try again."; bcMsgKind = "err"; }
+      else { bcMsg = `Check ${email} for your sign-in link. Open it on this device to land back here signed in.`; bcMsgKind = "ok"; }
+      renderBlue();
+    });
+    return;
+  }
+  const names = [...new Set(games.flatMap(g => g.players.map(p => g.league + "|" + p.name)))];
+  const lg0 = league === "NBA" ? "NBA" : "NFL";
+  top.innerHTML = `<div class="bcbar"><span class="bcwho">Signed in as <b>${esc(user.email || "")}</b> · ${chips.length} Blue Chip${chips.length === 1 ? "" : "s"}</span><button type="button" class="bbtn ghost" id="bcOut">Sign out</button></div>
+    <form class="bcform" id="bcAdd"><select id="bcLg" aria-label="League"><option${lg0 === "NFL" ? " selected" : ""}>NFL</option><option${lg0 === "NBA" ? " selected" : ""}>NBA</option></select>
+      <input type="text" id="bcName" list="bcNames" placeholder="Add a player" aria-label="Player name" autocomplete="off" maxlength="60">
+      <datalist id="bcNames"></datalist><button class="bbtn" type="submit">Add</button></form>${msg}`;
+  const fillNames = () => { const lg = $("bcLg").value; $("bcNames").innerHTML = names.filter(n => n.startsWith(lg + "|")).map(n => `<option value="${esc(n.slice(4))}">`).join(""); };
+  fillNames(); $("bcLg").addEventListener("change", fillNames);
+  $("bcAdd").addEventListener("submit", e => { e.preventDefault(); addChip($("bcLg").value, $("bcName").value); });
+  $("bcOut").addEventListener("click", async () => { await sb.auth.signOut(); });
+  list.innerHTML = !chipsLoaded ? `<div class="empty"><b>Loading your Blue Chips</b></div>`
+    : chips.length ? `<div class="bcgrid">${chips.map(chipCard).join("")}</div>`
+    : `<div class="empty"><b>No Blue Chips yet</b>Add a player above, or tap ☆ next to any name on the board.</div>`;
+  list.querySelectorAll("[data-unchip]").forEach(b => b.addEventListener("click", () => removeChip(b.dataset.unchip)));
+}
+if (sb) {
+  sb.auth.onAuthStateChange(async (event, session) => {
+    const was = user?.id; user = session?.user || null;
+    if (user && user.id !== was) { chipsLoaded = false; renderBlue(); await loadChips(); }
+    if (!user) { chips = []; chipsLoaded = true; }
+    if (event === "SIGNED_IN") {
+      let back = null; try { back = localStorage.getItem("pex.afterLogin"); } catch (_) {}
+      if (back) { lsDel("pex.afterLogin"); bcMsg = ""; location.hash = "#blue-chips"; }
+    }
+    if (event === "SIGNED_OUT") { bcMsg = "Signed out."; bcMsgKind = ""; }
+    renderBlue(); render();
+  });
+}
+fetch("data/players.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(d => { playerHist = d; renderBlue(); }).catch(() => {});
 const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
 function showView(){
-  const pen = location.hash === "#penalty-stocks";
-  $("viewBoard").hidden = pen; $("viewPenalty").hidden = !pen;
-  $("viewBoard").style.display = pen ? "none" : "grid"; $("viewPenalty").style.display = pen ? "grid" : "none";
-  $("tabBoard").setAttribute("aria-current", pen ? "false" : "page");
-  $("tabPenalty").setAttribute("aria-current", pen ? "page" : "false");
+  const v = location.hash === "#penalty-stocks" ? "penalty" : location.hash === "#blue-chips" ? "blue" : "board";
+  [["board", "viewBoard", "tabBoard"], ["penalty", "viewPenalty", "tabPenalty"], ["blue", "viewBlue", "tabBlue"]].forEach(([k, view, tab]) => {
+    $(view).hidden = v !== k; $(view).style.display = v === k ? "grid" : "none";
+    $(tab).setAttribute("aria-current", v === k ? "page" : "false");
+  });
 }
 window.addEventListener("hashchange", showView);
 function pickText(par){
@@ -411,7 +574,7 @@ function render(){
       const vkey = g.league + g.id + "|" + p.name, vopen = vsOpen.has(vkey);
       const hot = p.props.some(x => x.vs?.hot);
       const out = isOut(p);
-      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} of ${p.props.length} props projected to hit`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}${dvpLine(p)}</td></tr>
+      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="star${isChip(g.league, p.name) ? " on" : ""}" data-star="${esc(g.league + "|" + p.name)}" aria-label="${isChip(g.league, p.name) ? "Remove from" : "Add to"} Blue Chips" title="${isChip(g.league, p.name) ? "In your Blue Chips" : "Add to Blue Chips"}">${isChip(g.league, p.name) ? "★" : "☆"}</button><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} of ${p.props.length} props projected to hit`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}${dvpLine(p)}</td></tr>
       <tr class="vsrow"${vopen ? "" : " hidden"}><td colspan="8">${vopen ? vsPanel(p) : ""}</td></tr>` +
       p.props.map(x => {
         const up = x.call === "hit", se = x.season || {};
@@ -440,6 +603,9 @@ function render(){
         : `<div class="empty" style="margin:12px;border-color:var(--grid)">No props in this game match your filters.</div>`}</div>
     </details>`;
   }).join("");
+  board.querySelectorAll("[data-star]").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.star, cut = k.indexOf("|"); toggleStar(k.slice(0, cut), k.slice(cut + 1));
+  }));
   board.querySelectorAll(".pbtn").forEach(b => b.addEventListener("click", () => {
     const key = b.dataset.vs, row = b.closest("tr").nextElementSibling, open = !vsOpen.has(key);
     open ? vsOpen.add(key) : vsOpen.delete(key);
@@ -498,7 +664,7 @@ showView();
     run = {run: b.run, createdAt: b.createdAt, leagues: b.leagues};
     games = b.games || [];
     parlays = b.parlays || [];
-    render();
+    render(); renderBlue();
   } catch (e) {
     $("status").innerHTML = `<span class="d">The board data could not be loaded. Refresh the page to try again.</span>`;
     $("board").innerHTML = `<div class="empty"><b>No board yet</b>Today's data has not been published. Check back after the daily update.</div>`;
