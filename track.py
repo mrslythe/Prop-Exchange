@@ -14,7 +14,7 @@ import json
 import os
 from zoneinfo import ZoneInfo
 
-from build_board import ESPN_SPORT, get, num
+from build_board import ESPN_SPORT, get, num, stat_value
 
 ET = ZoneInfo("America/New_York")
 GRADE_AFTER = dt.timedelta(hours=4)   # a game is treated as finished this long after its start
@@ -70,6 +70,60 @@ def record_picks(board, data_dir, now):
     for path, data in files.items():
         _save(path, data)
     return sum(len(d["picks"]) for d in files.values())
+
+
+def record_parlays(board, data_dir, now):
+    """Save each Penalty Stocks parlay under the date of its first leg, until that leg starts."""
+    os.makedirs(f"{data_dir}/parlays", exist_ok=True)
+    saved = 0
+    for par in board.get("parlays", []):
+        legs = par.get("legs") or []
+        starts = [_start(l.get("start")) for l in legs]
+        if not legs or any(s is None for s in starts) or not all(l.get("event") and l.get("pid") for l in legs):
+            continue
+        first = min(starts)
+        if first <= now:
+            continue  # already under way: keep the version saved before it started
+        day = first.astimezone(ET).date().isoformat()
+        path = f"{data_dir}/parlays/{day}.json"
+        data = _load(path)
+        data.setdefault("parlays", {})
+        data["parlays"][par["id"]] = {
+            "id": par["id"], "lg": par["league"], "s": par["stat"], "first": first.isoformat(),
+            "american": par.get("american"), "proj": par.get("proj"), "implied": par.get("implied"),
+            "legs": [{"key": f"{par['league']}|{l['event']}|{l['pid']}|{par['stat']}", "n": l["name"],
+                      "line": l["line"], "odds": l["odds"], "proj": l["proj"]} for l in legs],
+        }
+        _save(path, {"picks": data.get("picks", {}), "parlays": data["parlays"]})
+        saved += 1
+    return saved
+
+
+def _parlay_results(data_dir):
+    """Grade saved parlays from their legs' pick results. A push or did-not-play leg drops out,
+    as sportsbooks do; the parlay wins if every remaining leg went over."""
+    results = {}
+    for path in sorted(glob.glob(f"{data_dir}/picks/*.json")):
+        for key, p in _load(path)["picks"].items():
+            results[key] = p
+    out = []
+    for path in sorted(glob.glob(f"{data_dir}/parlays/*.json")):
+        day = os.path.basename(path)[:-5]
+        for par in (_load(path).get("parlays") or {}).values():
+            legs = [results.get(l["key"]) for l in par["legs"]]
+            rs = [(p or {}).get("r") for p in legs]
+            if any(r == "under" for r in rs):
+                res = "lost"
+            elif any(r is None for r in rs):
+                res = "pending"
+            else:
+                live = [r for r in rs if r == "over"]
+                res = "won" if live else "void"
+            out.append({"d": day, "id": par["id"], "lg": par["lg"], "s": par["s"], "american": par.get("american"),
+                        "proj": par.get("proj"), "res": res,
+                        "legs": [{"n": l["n"], "line": l["line"], "r": r, "a": (p or {}).get("a")}
+                                 for l, p, r in zip(par["legs"], legs, rs)]})
+    return out
 
 
 def _season_log(league, pid):
@@ -129,11 +183,11 @@ def grade(data_dir, now, days_back=14):
                     p["r"] = "dnp"
                     graded += 1
                 continue
-            vals = [stats.get(k) for k in p.get("k") or []]
-            if not vals or any(v is None for v in vals):
+            val = stat_value(stats, p.get("k") or [], p.get("s", ""))
+            if val is None:
                 p["r"] = "dnp"
             else:
-                p["a"] = round(sum(vals), 1)
+                p["a"] = val
                 p["r"] = "over" if p["a"] > p["line"] else ("push" if p["a"] == p["line"] else "under")
             graded += 1
     for path, data in files.items():
@@ -197,6 +251,13 @@ def summarize(data_dir, now):
         rec["latest"] = {"d": day, "picks": [
             {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"],
              "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in greens]}
+    pars = _parlay_results(data_dir)
+    done = [p for p in pars if p["res"] in ("won", "lost")]
+    rec["parlays"] = {
+        "n": len(done), "won": sum(p["res"] == "won" for p in done),
+        "pending": sum(p["res"] == "pending" for p in pars),
+        "recent": [p for p in pars if p["res"] != "pending"][-15:][::-1],
+    }
     with open(f"{data_dir}/record.json", "w") as f:
         json.dump(rec, f, separators=(",", ":"))
     return rec

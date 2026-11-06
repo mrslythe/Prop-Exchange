@@ -35,6 +35,7 @@ PROPS = {
         "rush-attempts": ("Rush Att", ["rushingAttempts"]),
         "receiving-yards": ("Rec Yds", ["receivingYards"]),
         "receptions": ("Receptions", ["receptions"]),
+        "touchdowns": ("Anytime TD", ["rushingTouchdowns", "receivingTouchdowns"]),
         "rushing-&-receiving-yards": ("Rush+Rec Yds", ["rushingYards", "receivingYards"]),
         "passing-&-rushing-yards": ("Pass+Rush Yds", ["passingYards", "rushingYards"]),
     },
@@ -52,6 +53,16 @@ PROPS = {
     },
 }
 ESPN_SPORT = {"nfl": "football", "nba": "basketball"}
+# Stats where a missing column counts as 0 (a QB's log has no receiving TDs, a WR's may have no rushing TDs).
+PARTIAL_OK = {"Anytime TD"}
+
+
+def stat_value(stats, keys, label=""):
+    """The prop's number for one game, or None if the game has no such stat."""
+    vals = [stats.get(k) for k in keys]
+    if all(v is None for v in vals) or (label not in PARTIAL_OK and any(v is None for v in vals)):
+        return None
+    return round(sum(v or 0 for v in vals), 1)
 
 
 def get(url, tries=3):
@@ -123,6 +134,10 @@ def parse_props(league, slug):
         name = re.search(r'<div class="props-name">\s*<a [^>]*>([^<]+)</a>', li)
         match = re.search(r'small gray">([^<]+)<', li)
         lines = re.findall(r'data-moneyline">\s*([ou])([\d.]+)\s*</span>\s*<small class="data-odds[^"]*">\s*([^<]+?)\s*<', li)
+        if not lines and slug == "touchdowns":
+            # anytime TD has no over/under, just a "yes" price: treat it as over 0.5 at that price
+            yes = re.search(r'data-moneyline">\s*([+-]\d+|even)\s*<', li)
+            lines = [("o", "0.5", yes.group(1))] if yes else []
         if not (ev and name and lines):
             continue
         over = next(((float(l), o) for s, l, o in lines if s == "o"), None)
@@ -472,10 +487,10 @@ def build(league):
         label, keys = PROPS[league][p["slug"]]
         played = []  # every game with this stat, newest first
         for g in logs.get(p["player"], []):
-            vs = [g["stats"].get(k) for k in keys]
-            if any(v is None for v in vs):
+            v = stat_value(g["stats"], keys, label)
+            if v is None:
                 continue
-            played.append({"v": round(sum(vs), 1), "date": g["date"], "opp": g["opp"],
+            played.append({"v": v, "date": g["date"], "opp": g["opp"],
                            "atVs": g["atVs"], "cur": g.get("cur", True)})
         last = [{k: x[k] for k in ("v", "date", "opp", "atVs")} for x in played[:5]]
         if len(last) < 5:
@@ -516,8 +531,7 @@ def build(league):
         vs_games = pl["vs"]["_games"] if pl["vs"] else []
         vv = []
         for vg in vs_games:
-            xs = [vg["stats"].get(k) for k in keys]
-            vv.append(None if any(x is None for x in xs) else round(sum(xs), 1))
+            vv.append(stat_value(vg["stats"], keys, label))
         got = [x for x in vv if x is not None]
         vs_hits = sum(1 for x in got if x > line)
         pl["props"].append({
@@ -579,6 +593,8 @@ if __name__ == "__main__":
         board["games"] += [{"league": lg.upper(), **g} for g in data["games"]]
         print(f"{lg}: {len(data['games'])} games, {n} props, skipped {data.get('propsSkipped')}",
               data.get("error") or "")
+    import penalty
+    board["parlays"] = penalty.build(board["games"])
     os.makedirs(data_dir, exist_ok=True)
     if board["games"]:
         with open(out, "w") as f:
@@ -590,6 +606,7 @@ if __name__ == "__main__":
 
     # results tracker: save today's calls, grade finished games, rebuild the track record
     saved = track.record_picks(board, data_dir, now)
+    track.record_parlays(board, data_dir, now)
     graded = track.grade(data_dir, now)
     rec = track.summarize(data_dir, now)
     t = rec["total"]

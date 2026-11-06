@@ -106,6 +106,42 @@ details.record[open]>summary{border-bottom:1px solid var(--rule);background:var(
 .rbody .wide{grid-column:1/-1}
 .rnote{color:var(--muted);font-size:12px;margin:0;padding:12px}
 .rbar{display:inline-block;height:8px;border-radius:1px;background:var(--up);vertical-align:middle}
+.tabs{display:flex;gap:0;border-bottom:1px solid var(--rule)}
+.tabs a{font-family:var(--cond);font-weight:700;font-size:17px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);text-decoration:none;padding:8px 16px;border-bottom:3px solid transparent;margin-bottom:-1px}
+.tabs a[aria-current="page"]{color:var(--amber);border-bottom-color:var(--amber)}
+.tabs a:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.pgrid{display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(330px,1fr))}
+.pcard{background:var(--panel);border:1px solid var(--grid);border-radius:3px;display:grid;grid-template-rows:auto 1fr auto auto;min-width:0}
+.pcard header{display:flex;justify-content:space-between;align-items:start;gap:10px;padding:12px 14px 8px;border-bottom:1px solid var(--rule);background:var(--panel2)}
+.pcard h3{margin:0;font-family:var(--cond);font-size:21px;letter-spacing:.05em;text-transform:uppercase;line-height:1.1}
+.pcard h3 small{display:block;font-family:var(--mono);font-size:11px;letter-spacing:.08em;color:var(--muted);font-weight:500}
+.pay{text-align:right;font-variant-numeric:tabular-nums}
+.pay b{display:block;font-size:24px;color:var(--up);font-weight:700;line-height:1}
+.pay small{color:var(--muted);font-size:11px}
+.legs{list-style:none;margin:0;padding:6px 14px;display:grid}
+.legs li{display:grid;grid-template-columns:1fr auto;gap:2px 10px;padding:7px 0;border-bottom:1px solid var(--grid);min-width:0}
+.legs li:last-child{border-bottom:0}
+.legs .ln{font-weight:600;overflow-wrap:anywhere}
+.legs .ln span{color:var(--amber);font-weight:500;margin-left:6px;font-size:12px}
+.legs .lg{color:var(--muted);font-size:12px;grid-column:1}
+.legs .lp{grid-row:1/3;grid-column:2;align-self:center;text-align:right}
+.legs .lp b{display:block;background:var(--up);color:#04140b;border-radius:2px;padding:1px 8px;font-size:13px}
+.legs .lp small{color:var(--muted);font-size:11px}
+.pmath{padding:8px 14px;color:var(--muted);font-size:12px;border-top:1px solid var(--rule);display:flex;flex-wrap:wrap;gap:4px 14px}
+.pmath b{color:var(--fg)}
+.pbtns{display:flex;flex-wrap:wrap;align-items:center;gap:8px;padding:10px 14px 14px}
+.pbtns a,.pbtns button{font-family:var(--cond);font-weight:700;font-size:15px;letter-spacing:.06em;text-transform:uppercase;padding:7px 12px;border-radius:3px;cursor:pointer;text-decoration:none;border:1px solid var(--rule);background:var(--bg);color:var(--fg)}
+.pbtns a.hr{border-color:#c9a227;color:#f1d27a}
+.pbtns a.pp{border-color:#8b5cf6;color:#c4b5fd}
+.pbtns a:hover,.pbtns button:hover{background:var(--panel2)}
+.pbtns a:focus-visible,.pbtns button:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+.pnote{color:var(--muted);font-size:12px;line-height:1.6;max-width:90ch;margin:0}
+.pnote b{color:var(--fg)}
+.precord{display:flex;flex-wrap:wrap;gap:6px 18px;color:var(--muted);font-size:12px}
+.precord b{color:var(--fg);font-size:14px}
+.precent{display:flex;flex-wrap:wrap;gap:6px}
+.precent span{font-size:11px;padding:2px 7px;border-radius:2px;background:var(--panel2);border:1px solid var(--rule)}
+.precent span.w{color:var(--up);border-color:var(--up)} .precent span.l{color:var(--down)}
 .legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px}
 .pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
 .tbl{overflow-x:auto}
@@ -166,6 +202,8 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 </header>
 
 <main class="gut">
+  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penalty-stocks" id="tabPenalty">Penalty Stocks</a></nav>
+  <div id="viewBoard" style="display:grid;gap:12px">
   <div class="legend" aria-label="Icon key"><span>🎂 Birthday today</span><span>😤 Revenge game: faces last season's team</span><span>🏠 Hometown: born within 35 miles of the arena</span><span>📍 Home state</span></div>
   <details class="record" id="record"><summary><span class="rtitle">Track record</span><span class="rstat">Loading results…</span></summary><div id="recordBody"></div></details>
   <div class="status" id="status"><span>Connecting to the board…</span></div>
@@ -180,11 +218,19 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Vegas %:</b> the chance the over price implies. Projected well above it is the better play.</li>
       <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
       <li><b>Injuries:</b> ⚠️ questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
+      <li><b>Penalty Stocks tab:</b> five parlays per sport from the top green calls, with links to build them on Hard Rock or PrizePicks.</li>
       <li><b>Track record:</b> every call is graded after the game, so you can see how often green and red calls are right.</li>
       <li><b>Badges:</b> 🎂 birthday · 😤 faces last season's team · 🏠 born within 35 miles · 📍 home state.</li>
       <li>Stats from ESPN. Ignores injuries and matchups, so treat it as one input.</li>
     </ul>
   </details>
+  </div>
+  <section id="viewPenalty" hidden style="display:grid;gap:14px">
+    <p class="pnote"><b>Penalty Stocks</b> are five parlays per sport, built from the board's highest projected green calls for one stat each. One leg per player, no injured players, same-game legs allowed. They rebuild on every update.</p>
+    <div class="precord" id="precord">Parlay record loading…</div>
+    <div class="pgrid" id="pgrid"><div class="empty"><b>Loading parlays</b>The parlays appear here after the board loads.</div></div>
+    <p class="pnote"><b>Building it in the app:</b> "Hard Rock" and "PrizePicks" open their site or app; add the picks yourself. "Copy picks" puts the legs on your clipboard. Payouts use the best over price across sportsbooks, so Hard Rock's price can differ, and PrizePicks uses its own lines and payouts and may not offer every prop. <b>Combined chance</b> multiplies each leg's Projected %, so it assumes the legs are independent; same-game legs tend to win or lose together. For entertainment only. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
+  </section>
 </main>
 
 <script>
@@ -209,6 +255,54 @@ function when(iso){
   return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
 let special = false;
+let parlays = [], rec = null;
+const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
+function showView(){
+  const pen = location.hash === "#penalty-stocks";
+  $("viewBoard").hidden = pen; $("viewPenalty").hidden = !pen;
+  $("viewBoard").style.display = pen ? "none" : "grid"; $("viewPenalty").style.display = pen ? "grid" : "none";
+  $("tabBoard").setAttribute("aria-current", pen ? "false" : "page");
+  $("tabPenalty").setAttribute("aria-current", pen ? "page" : "false");
+}
+window.addEventListener("hashchange", showView);
+function pickText(par){
+  return `Prop Exchange: ${par.league} ${par.stat} parlay (${par.american})\n` +
+    par.legs.map(l => `${l.name} over ${l.line} ${par.stat === "Anytime TD" ? "(anytime TD)" : par.stat}`).join("\n");
+}
+async function copyPicks(btn, text){
+  try { await navigator.clipboard.writeText(text); btn.textContent = "Copied"; }
+  catch (e) {
+    const ta = document.createElement("textarea"); ta.value = text; ta.setAttribute("readonly", ""); ta.style.position = "fixed"; ta.style.opacity = "0";
+    document.body.appendChild(ta); ta.select();
+    let ok = false; try { ok = document.execCommand("copy"); } catch (_) {}
+    ta.remove(); btn.textContent = ok ? "Copied" : "Copy failed: select the picks above";
+  }
+  setTimeout(() => { btn.textContent = "Copy picks"; }, 2500);
+}
+function renderPenalty(){
+  const list = parlays.filter(p => league === "ALL" || p.league === league);
+  const pr = rec?.parlays;
+  $("precord").innerHTML = pr && pr.n
+    ? `<span>Parlay record <b>${pr.won} of ${pr.n} hit</b> (${Math.round(100*pr.won/pr.n)}%)</span>${pr.pending ? `<span>${pr.pending} waiting on games</span>` : ""}<span class="precent">${(pr.recent||[]).slice(0,10).map(p => `<span class="${p.res === "won" ? "w" : p.res === "lost" ? "l" : ""}" title="${esc(p.d)}">${esc(p.lg)} ${esc(p.s)} ${p.res === "won" ? "✓ " + esc(p.american||"") : p.res === "lost" ? "✗" : "void"}</span>`).join("")}</span>`
+    : `<span>No parlays graded yet. ${pr?.pending ? `<b>${pr.pending}</b> saved and waiting on their games.` : "Each parlay is saved before its first leg starts and graded after the games."}</span>`;
+  if (!list.length) { $("pgrid").innerHTML = `<div class="empty"><b>No parlays right now</b>The next update builds new ones once Vegas posts props.</div>`; return; }
+  $("pgrid").innerHTML = list.map((par, i) => {
+    if (!par.legs.length) return `<article class="pcard"><header><h3><small>${esc(par.league)}</small>${esc(par.stat)}</h3></header><p class="pnote" style="padding:12px 14px">${esc(par.note || "No parlay today.")}</p></article>`;
+    const legs = par.legs.map(l => `<li><span class="ln">${esc(l.name)}<span>${esc(l.team||"")}</span></span>
+        <span class="lg">Over ${l.line}${par.stat === "Anytime TD" ? " (anytime TD)" : " " + esc(par.stat)} · ${esc(l.game)} · ${esc(when(l.start))}</span>
+        <span class="lp"><b>${l.proj}%</b><small>${esc(l.odds)}</small></span></li>`).join("");
+    return `<article class="pcard">
+      <header><h3><small>${esc(par.league)} · ${par.legs.length} legs</small>${esc(par.stat)}</h3><div class="pay"><b>${esc(par.american)}</b><small>$10 pays $${(10*par.dec).toFixed(2)}</small></div></header>
+      <ul class="legs">${legs}</ul>
+      <div class="pmath"><span>Combined chance <b>${par.proj}%</b></span><span>Sportsbook implies <b>${par.implied}%</b></span></div>
+      <div class="pbtns">
+        <a class="hr" href="${HARDROCK}" target="_blank" rel="noopener">Hard Rock</a>
+        <a class="pp" href="${PRIZEPICKS}" target="_blank" rel="noopener">PrizePicks</a>
+        <button type="button" data-copy="${i}">Copy picks</button>
+      </div></article>`;
+  }).join("");
+  $("pgrid").querySelectorAll("[data-copy]").forEach(b => b.addEventListener("click", () => copyPicks(b, pickText(list[Number(b.dataset.copy)]))));
+}
 const OUT = new Set(["Out", "Injured Reserve", "Doubtful", "Suspension"]);
 const isOut = p => OUT.has(p.injury?.status);
 function injTag(p){
@@ -250,6 +344,7 @@ function oddsTxt(o){ return o ? `${o.line} ${o.odds}` : "—"; }
 
 function render(){
   document.querySelectorAll("[data-lg]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lg === league)));
+  renderPenalty();
   const list = games.filter(g => league === "ALL" || g.league === league).sort((a,b) => (a.start||"").localeCompare(b.start||""));
 
   // stat options
@@ -378,9 +473,10 @@ function renderRecord(r){
   </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Pushes and players who did not play are not counted. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>`;
 }
 fetch("data/record.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(r => {
-  if (r) renderRecord(r); else document.querySelector("#record .rstat").textContent = "Results will appear after the first games are graded.";
+  if (r) { rec = r; renderRecord(r); renderPenalty(); } else document.querySelector("#record .rstat").textContent = "Results will appear after the first games are graded.";
 }).catch(() => { document.querySelector("#record .rstat").textContent = "Results could not be loaded."; });
 
+showView();
 (async () => {
   try {
     const res = await fetch("data/board.json?t=" + Date.now(), {cache: "no-store"});
@@ -388,6 +484,7 @@ fetch("data/record.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? 
     const b = await res.json();
     run = {run: b.run, createdAt: b.createdAt, leagues: b.leagues};
     games = b.games || [];
+    parlays = b.parlays || [];
     render();
   } catch (e) {
     $("status").innerHTML = `<span class="d">The board data could not be loaded. Refresh the page to try again.</span>`;
