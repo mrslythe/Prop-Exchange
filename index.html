@@ -58,6 +58,12 @@ details[open] .caret{transform:rotate(90deg)}
 .gmeta b{color:var(--fg);font-weight:500}
 .gcount{display:flex;gap:6px;font-weight:600}
 .pill{padding:2px 7px;border-radius:2px;font-size:12px}
+.pill.s{background:var(--panel2);color:var(--fg);border:1px solid var(--rule)}
+.badge{display:inline-flex;align-items:center;gap:4px;margin-left:10px;padding:1px 8px;border-radius:999px;font-size:11px;font-family:var(--mono);background:var(--panel2);border:1px solid var(--rule);color:var(--fg);white-space:nowrap;vertical-align:middle}
+.badge.birthday{border-color:#d58bd9;color:#f1c6f3}
+.badge.revenge{border-color:var(--down);color:#ffb3b4}
+.badge.hometown{border-color:var(--amber);color:#ffd88f}
+.legend{display:flex;flex-wrap:wrap;gap:6px 16px;color:var(--muted);font-size:12px}
 .pill.u{background:var(--up-bg);color:var(--up)} .pill.d{background:var(--down-bg);color:var(--down)}
 .tbl{overflow-x:auto}
 table{width:100%;border-collapse:collapse;font-variant-numeric:tabular-nums;min-width:640px}
@@ -102,6 +108,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
         <option value="miss">Misses only (red)</option>
         <option value="5">5 of 5 last games only</option>
         <option value="70">Projected 70%+</option>
+        <option value="special">Special games (🎂 😤 🏠 📍)</option>
       </select>
       <select id="stat" aria-label="Stat"><option value="">Every stat</option></select>
       <input id="q" type="search" placeholder="Find player" aria-label="Find player">
@@ -111,12 +118,13 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 </header>
 
 <main class="gut">
+  <div class="legend" aria-label="Icon key"><span>🎂 Birthday today</span><span>😤 Revenge game: faces last season's team</span><span>🏠 Hometown: born within 35 miles of the arena</span><span>📍 Home state</span></div>
   <div class="status" id="status"><span>Connecting to the board…</span></div>
   <div id="board" style="display:grid;gap:12px">
     <div class="empty"><b>Loading today's board</b>Games, players and their last five games appear here after each daily update.</div>
   </div>
   <p class="foot">
-    <b>How a call is made.</b> Lines come from scoresandodds.com. The line shown is the consensus: the midpoint of the best over and best under on the board. Stats come from ESPN game logs. <b>Last 5</b> shows the player's five most recent games, newest on the right, green when the game went over the line. <b>Season</b> is every game this season against the same line. <b>Projected</b> blends the two: 60% season hit rate plus 40% last-5 hit rate, so a hot or cold week counts without outweighing the whole season. Early in a season, with fewer than 5 games played, it leans more on the last 5, which reach back into last season. <b>Green means projected 55% or higher</b>; red means lower. <b>Vegas %</b> is the chance the sportsbook's over price implies (it includes their cut), so a projection well above it is the more interesting play. These numbers ignore injuries, matchups and minutes, so treat them as one input, not a sure thing.
+    <b>How a call is made.</b> Lines come from scoresandodds.com. The line shown is the consensus: the midpoint of the best over and best under on the board. Stats come from ESPN game logs. <b>Last 5</b> shows the player's five most recent games, newest on the right, green when the game went over the line. <b>Season</b> is every game this season against the same line. <b>Projected</b> blends the two: 60% season hit rate plus 40% last-5 hit rate, so a hot or cold week counts without outweighing the whole season. Early in a season, with fewer than 5 games played, it leans more on the last 5, which reach back into last season. <b>Green means projected 55% or higher</b>; red means lower. <b>Vegas %</b> is the chance the sportsbook's over price implies (it includes their cut), so a projection well above it is the more interesting play. <b>Badges:</b> 🎂 the game falls on the player's birthday (by Eastern time). 😤 the opponent is a team the player played for last season. 🏠 the arena is within 35 miles of where the player was born. 📍 the game is in the player's birth state (or birth country, outside the US). Birthplaces come from ESPN and show where a player was born, not always where he grew up. These numbers ignore injuries, matchups and minutes, so treat them as one input, not a sure thing.
   </p>
 </main>
 
@@ -132,7 +140,7 @@ function lsSet(k,v){try{localStorage.setItem(k,v)}catch(e){}}
 const saved = lsGet("pex.league"); if (saved) league = saved;
 
 document.querySelectorAll("[data-lg]").forEach(b => b.onclick = () => { league = b.dataset.lg; lsSet("pex.league", league); render(); });
-$("show").onchange = () => { show = $("show").value; render(); };
+$("show").onchange = () => { show = $("show").value; special = show === "special"; render(); };
 $("stat").onchange = () => { statF = $("stat").value; render(); };
 $("q").oninput = () => { q = $("q").value.trim().toLowerCase(); render(); };
 
@@ -141,6 +149,7 @@ function when(iso){
   const d = new Date(iso);
   return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
+let special = false;
 function keep(p){
   if (show === "hit" && p.call !== "hit") return false;
   if (show === "miss" && p.call !== "miss") return false;
@@ -191,16 +200,20 @@ function render(){
   board.innerHTML = list.map((g, gi) => {
     const a = g.teams?.away || {}, h = g.teams?.home || {};
     const players = g.players.map(p => ({...p, props: p.props.filter(keep)}))
-      .filter(p => p.props.length && (!q || p.name.toLowerCase().includes(q)));
+      .filter(p => p.props.length && (!q || p.name.toLowerCase().includes(q)) && (!special || (p.badges||[]).length));
+    const icons = g.players.flatMap(p => (p.badges||[]).map(bd => bd.icon));
+    const iconTxt = ["🎂","😤","🏠","📍"].map(i => [i, icons.filter(x => x === i).length]).filter(([,n]) => n)
+      .map(([i,n]) => `<span class="pill s" title="${n} player${n>1?"s":""}">${i} ${n}</span>`).join("");
     const props = g.players.flatMap(p => p.props);
     const gu = props.filter(x => x.call === "hit").length;
+    if (special && !players.length) return "";
     const key = g.league + g.id;
     const open = openState.has(key) || (firstOpen && gi === 0) || (q && players.length);
     if (firstOpen && gi === 0) openState.add(key);
     const spread = a.spread?.v ? `${esc(a.abbr || a.name)} ${esc(a.spread.v)}` : "";
     const rows = players.map(p => {
       const pu = p.props.filter(x => x.call === "hit").length;
-      return `<tr class="player"><td colspan="8"><span class="pn">${esc(p.name)}</span><span class="tm">${esc(p.team||"")}</span><span class="ps">${pu} of ${p.props.length} props projected to hit</span></td></tr>` +
+      return `<tr class="player"><td colspan="8"><span class="pn">${esc(p.name)}</span><span class="tm">${esc(p.team||"")}</span><span class="ps">${pu} of ${p.props.length} props projected to hit</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}</td></tr>` +
       p.props.map(x => {
         const up = x.call === "hit", se = x.season || {};
         const cells = [...x.last5].reverse().map((v, i, arr) =>
@@ -216,7 +229,7 @@ function render(){
       <summary>
         <span class="caret">▶</span>
         <span class="gname">${esc(a.name)}<em>@</em>${esc(h.name)}</span>
-        <span class="gcount"><span class="pill u">▲ ${gu}</span><span class="pill d">▼ ${props.length-gu}</span></span>
+        <span class="gcount">${iconTxt}<span class="pill u">▲ ${gu}</span><span class="pill d">▼ ${props.length-gu}</span></span>
         <span class="gmeta"><span><b>${esc(g.league)}</b></span><span>${esc(when(g.start))}</span>
           ${spread ? `<span>Spread <b>${spread}</b></span>` : ""}
           ${a.total?.v ? `<span>Total <b>${esc(a.total.v.replace(/^o/,""))}</b></span>` : ""}

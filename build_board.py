@@ -11,11 +11,14 @@ import concurrent.futures as cf
 import datetime as dt
 import html
 import json
+import math
+import os
 import re
 import subprocess
 import sys
 import time
 import urllib.parse
+from zoneinfo import ZoneInfo
 
 UA = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124 Safari/537.36"
 SAO = "https://www.scoresandodds.com"
@@ -223,6 +226,182 @@ def implied(odds):
     return round(100 * (-v / (-v + 100) if v < 0 else 100 / (v + 100)))
 
 
+# ---------------- special games: birthday, revenge, hometown ----------------
+ET = ZoneInfo("America/New_York")
+HOME_MILES = 35  # birthplace within this distance of the arena counts as a hometown game
+# Birthplaces ESPN lists as neighborhoods or boroughs that are not Census places.
+PLACE_ALIASES = {
+    ("NY", "brooklyn"): ("NY", "new york"), ("NY", "bronx"): ("NY", "new york"),
+    ("NY", "the bronx"): ("NY", "new york"), ("NY", "queens"): ("NY", "new york"),
+    ("NY", "manhattan"): ("NY", "new york"), ("NY", "harlem"): ("NY", "new york"),
+    ("NY", "staten island"): ("NY", "new york"), ("NY", "new york city"): ("NY", "new york"),
+    ("CA", "hollywood"): ("CA", "los angeles"), ("CA", "north hollywood"): ("CA", "los angeles"),
+    ("CA", "van nuys"): ("CA", "los angeles"), ("CA", "san pedro"): ("CA", "los angeles"),
+    ("CA", "watts"): ("CA", "los angeles"), ("CA", "sherman oaks"): ("CA", "los angeles"),
+    ("CA", "encino"): ("CA", "los angeles"), ("CA", "panorama city"): ("CA", "los angeles"),
+    ("CA", "south central los angeles"): ("CA", "los angeles"),
+}
+# Canadian cities for Toronto (Raptors) and other games in Canada.
+CANADA = {
+    "toronto": (43.653, -79.383), "scarborough": (43.777, -79.231), "etobicoke": (43.620, -79.513),
+    "north york": (43.761, -79.411), "mississauga": (43.589, -79.644), "brampton": (43.732, -79.762),
+    "markham": (43.857, -79.337), "vaughan": (43.837, -79.508), "richmond hill": (43.882, -79.440),
+    "oakville": (43.468, -79.687), "pickering": (43.838, -79.086), "ajax": (43.851, -79.020),
+    "hamilton": (43.256, -79.869), "montreal": (45.502, -73.567), "vancouver": (49.283, -123.121),
+}
+CA_PROVINCES = {"ON", "QC", "BC", "AB", "MB", "SK", "NS", "NB", "NL", "PE"}
+_PLACES = None
+
+
+def places():
+    global _PLACES
+    if _PLACES is None:
+        _PLACES = {}
+        path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "data", "us_places.tsv")
+        try:
+            with open(path) as f:
+                for line in f:
+                    if line.startswith("#"):
+                        continue
+                    st, name, lat, lon = line.rstrip("\n").split("\t")
+                    _PLACES[(st, name.lower())] = (float(lat), float(lon))
+        except OSError:
+            pass
+    return _PLACES
+
+
+def locate(city, state, country):
+    city = (city or "").strip().lower().replace("st. ", "saint ")
+    if not city:
+        return None
+    if (country or "").lower() == "canada" or state in CA_PROVINCES:
+        return CANADA.get(city)
+    key = PLACE_ALIASES.get((state, city), (state, city))
+    pl = places()
+    return pl.get(key) or pl.get((key[0], key[1].replace("saint ", "st. ")))
+
+
+def miles(a, b):
+    la1, lo1, la2, lo2 = map(math.radians, (*a, *b))
+    h = math.sin((la2 - la1) / 2) ** 2 + math.cos(la1) * math.cos(la2) * math.sin((lo2 - lo1) / 2) ** 2
+    return 3958.8 * 2 * math.asin(math.sqrt(h))
+
+
+def current_season(league):
+    t = dt.date.today()
+    if league == "nba":  # ESPN names NBA seasons by end year: 2026-27 is 2027
+        return t.year + 1 if t.month >= 8 else t.year
+    return t.year if t.month >= 6 else t.year - 1
+
+
+def espn_teams(league):
+    url = f"https://site.api.espn.com/apis/site/v2/sports/{ESPN_SPORT[league]}/{league}/teams"
+    try:
+        d = json.loads(get(url))
+        return {t["team"]["id"]: t["team"] for t in d["sports"][0]["leagues"][0]["teams"]}
+    except Exception:
+        return {}
+
+
+def team_id(teams, nickname):
+    n = (nickname or "").lower()
+    for tid, t in teams.items():
+        if t.get("name", "").lower() == n or t.get("displayName", "").lower().endswith(" " + n):
+            return tid
+    return None
+
+
+def espn_venues(league, dates):
+    """(away team id, home team id) -> {city, state, country, name} for games on the given ET dates."""
+    out = {}
+    for d in sorted(dates):
+        url = (f"https://site.api.espn.com/apis/site/v2/sports/{ESPN_SPORT[league]}/{league}/scoreboard"
+               f"?dates={d.replace('-', '')}")
+        try:
+            data = json.loads(get(url))
+        except Exception:
+            continue
+        for e in data.get("events", []):
+            c = (e.get("competitions") or [{}])[0]
+            side = {t.get("homeAway"): t["team"]["id"] for t in c.get("competitors", [])}
+            v = c.get("venue") or {}
+            a = v.get("address") or {}
+            st = a.get("state", "")
+            country = a.get("country") or ("Canada" if st in CA_PROVINCES else ("USA" if st else ""))
+            if "away" in side and "home" in side:
+                out[(side["away"], side["home"])] = {"city": a.get("city", ""), "state": st,
+                                                     "country": country, "name": v.get("fullName", "")}
+    return out
+
+
+def espn_person(league, pid):
+    """Birth date, birthplace, current team id, and last season's team ids for one player."""
+    info = {"dob": None, "born": {}, "team": None, "lastTeams": set()}
+    try:
+        a = json.loads(get(f"https://sports.core.api.espn.com/v2/sports/{ESPN_SPORT[league]}/leagues/{league}/athletes/{pid}"))
+        info["dob"] = (a.get("dateOfBirth") or "")[:10] or None
+        info["born"] = a.get("birthPlace") or {}
+        m = re.search(r"/teams/(\d+)", (a.get("team") or {}).get("$ref", ""))
+        info["team"] = m.group(1) if m else None
+    except Exception:
+        pass
+    url = (f"https://site.web.api.espn.com/apis/common/v3/sports/{ESPN_SPORT[league]}/{league}"
+           f"/athletes/{pid}/gamelog?season={current_season(league) - 1}")
+    try:
+        d = json.loads(get(url))
+        for st in d.get("seasonTypes", []):
+            if "Regular" not in st.get("displayName", "") and "Postseason" not in st.get("displayName", ""):
+                continue
+            for cat in st.get("categories", []):
+                for e in cat.get("events", []):
+                    m = (d.get("events") or {}).get(e.get("eventId")) or {}
+                    tid = (m.get("team") or {}).get("id")
+                    if tid:
+                        info["lastTeams"].add(str(tid))
+    except Exception:
+        pass
+    return info
+
+
+def badges(person, game, teams, venue):
+    """Return the special-game markers for one player in one game."""
+    out = []
+    if not person:
+        return out
+    start = game.get("start")
+    local = dt.datetime.fromisoformat(start.replace("Z", "+00:00")).astimezone(ET).date() if start else None
+    # Birthday
+    if person["dob"] and local:
+        b = dt.date.fromisoformat(person["dob"])
+        if (b.month, b.day) == (local.month, local.day):
+            out.append({"icon": "🎂", "kind": "birthday", "text": f"Turns {local.year - b.year} today"})
+    # Revenge: today's opponent is a team he played for last season (and not his team now)
+    away, home = game.get("espnAway"), game.get("espnHome")
+    me = person["team"]
+    if me in (away, home):
+        opp = home if me == away else away
+        if opp in person["lastTeams"]:
+            name = (teams.get(opp) or {}).get("displayName", "this team")
+            out.append({"icon": "😤", "kind": "revenge", "text": f"Played for the {name} last season"})
+    # Hometown
+    born = person["born"] or {}
+    if venue and born.get("city"):
+        bc, bs, bco = born.get("city"), born.get("state", ""), born.get("country", "")
+        where = ", ".join(x for x in (bc, bs or bco) if x)
+        here = locate(venue["city"], venue["state"], venue["country"])
+        there = locate(bc, bs, bco)
+        same_city = bc.lower() == venue["city"].lower() and (bs or bco) in (venue["state"], venue["country"])
+        dist = miles(here, there) if here and there else None
+        if same_city or (dist is not None and dist <= HOME_MILES):
+            near = "" if same_city or dist is None or dist < 3 else f", {round(dist)} miles from the arena"
+            out.append({"icon": "🏠", "kind": "hometown", "text": f"Hometown game: born in {where}{near}"})
+        elif bs and bs == venue["state"] and venue["country"] in ("USA", ""):
+            out.append({"icon": "📍", "kind": "homestate", "text": f"Home-state game: born in {where}"})
+        elif not bs and bco and bco != "USA" and bco == venue["country"]:
+            out.append({"icon": "📍", "kind": "homestate", "text": f"Home-country game: born in {where}"})
+    return out
+
+
 def build(league):
     games = parse_games(league)
     props = []
@@ -236,6 +415,16 @@ def build(league):
         ids = dict(zip(names, ex.map(lambda n: espn_find(league, n), names)))
     with cf.ThreadPoolExecutor(8) as ex:
         logs = dict(zip(names, ex.map(lambda n: espn_games(league, ids[n]) if ids[n] else [], names)))
+    with cf.ThreadPoolExecutor(8) as ex:
+        people = dict(zip(names, ex.map(lambda n: espn_person(league, ids[n]) if ids[n] else None, names)))
+
+    teams = espn_teams(league)
+    for g in games.values():
+        g["espnAway"] = team_id(teams, (g["teams"].get("away") or {}).get("name"))
+        g["espnHome"] = team_id(teams, (g["teams"].get("home") or {}).get("name"))
+    dates = {dt.datetime.fromisoformat(g["start"].replace("Z", "+00:00")).astimezone(ET).date().isoformat()
+             for g in games.values() if g.get("start")}
+    venues = espn_venues(league, dates)
 
     board = {}
     skipped = 0
@@ -272,7 +461,13 @@ def build(league):
             proj = l5_pct
         gid = p["event"]
         gb = board.setdefault(gid, {"players": {}})
-        pl = gb["players"].setdefault(p["player"], {"name": p["player"], "team": p["team"], "props": []})
+        if p["player"] not in gb["players"]:
+            g = games[gid]
+            venue = venues.get((g.get("espnAway"), g.get("espnHome")))
+            g["venue"] = venue
+            gb["players"][p["player"]] = {"name": p["player"], "team": p["team"], "props": [],
+                                          "badges": badges(people.get(p["player"]), g, teams, venue)}
+        pl = gb["players"][p["player"]]
         pl["props"].append({
             "stat": label, "line": line, "over": p["over"], "under": p["under"],
             "last5": last, "hits": hits, "pct": l5_pct, "avg": avg,
