@@ -158,15 +158,6 @@ details.record[open]>summary{border-bottom:1px solid var(--rule);background:var(
 .bbtn.ghost{background:transparent;color:var(--fg);border-color:var(--rule)}
 .bbtn:disabled{opacity:.5;cursor:default}
 .bbtn:focus-visible{outline:2px solid var(--fg);outline-offset:2px}
-.bcsearch{position:relative;width:300px;max-width:100%}
-.bcsearch input{width:100%}
-.bcsugg{position:absolute;z-index:20;left:0;right:0;top:calc(100% + 2px);margin:0;padding:4px 0;list-style:none;background:var(--panel);border:1px solid var(--rule);border-radius:3px;max-height:320px;overflow-y:auto;box-shadow:0 8px 24px rgba(0,0,0,.45)}
-.bcsugg li{display:flex;justify-content:space-between;gap:10px;padding:8px 12px;cursor:pointer;font-size:13px}
-.bcsugg li small{color:var(--muted);font-size:11px;white-space:nowrap}
-.bcsugg li[aria-selected="true"],.bcsugg li:hover{background:var(--panel2);color:var(--amber)}
-.bcsugg li.none{cursor:default;color:var(--muted)}
-.bcsugg li.none:hover{background:none;color:var(--muted)}
-.bcsugg mark{background:none;color:var(--amber);font-weight:700}
 .bcmsg{font-size:12px;color:var(--muted);margin:0}
 .bcmsg.ok{color:var(--up)} .bcmsg.err{color:var(--down)}
 .bcwho{color:var(--muted);font-size:12px}
@@ -273,7 +264,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
       <li><b>Injuries:</b> ⚠️ questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
       <li><b>Penny Blocks tab:</b> five parlays per sport from the top green calls, with links to build them on Hard Rock or PrizePicks.</li>
-      <li><b>Blue Chips tab:</b> sign in with an emailed link, save the players you bet on (or tap ☆ on the board), and follow their props and recent results.</li>
+      <li><b>Blue Chips tab:</b> sign in with an emailed link, tap ☆ next to a player on the board to save him, and follow their props and recent results.</li>
       <li><b>Track record:</b> every call is graded after the game, so you can see how often green and red calls are right.</li>
       <li><b>Badges:</b> 🎂 birthday · 😤 faces last season's team · 🏠 born within 35 miles · 📍 home state.</li>
       <li>Stats from ESPN. Ignores injuries and matchups, so treat it as one input.</li>
@@ -287,7 +278,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
     <p class="pnote"><b>Building it in the app:</b> "Hard Rock" and "PrizePicks" open their site or app; add the picks yourself. "Copy picks" puts the legs on your clipboard. Payouts use the best over price across sportsbooks, so Hard Rock's price can differ, and PrizePicks uses its own lines and payouts and may not offer every prop. <b>Combined chance</b> multiplies each leg's Projected %, so it assumes the legs are independent; same-game legs tend to win or lose together. For entertainment only. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
   </section>
   <section id="viewBlue" hidden style="display:grid;gap:14px">
-    <p class="pnote"><b>Blue Chips</b> are the players you usually bet on. Save them here, or tap ☆ next to any name on the board, and see their props today and how the board's calls on them have done lately.</p>
+    <p class="pnote"><b>Blue Chips</b> are the players you usually bet on. Tap the ☆ next to any name on the board to save him here, and see their props today and how the board's calls on them have done lately.</p>
     <div id="bcTop"></div>
     <div id="bcList"></div>
   </section>
@@ -412,53 +403,12 @@ function renderBlue(){
     });
     return;
   }
-  // every player on today's board, for the search
-  const seen = new Set(), roster = [];
-  for (const g of games) for (const p of g.players) {
-    const k = g.league + "|" + p.name; if (seen.has(k)) continue; seen.add(k);
-    roster.push({lg: g.league, name: p.name, team: p.team || "", low: p.name.toLowerCase()});
-  }
-  roster.sort((a, b) => a.name.localeCompare(b.name));
-  const lg0 = league === "NBA" ? "NBA" : "NFL";
   top.innerHTML = `<div class="bcbar"><span class="bcwho">Signed in as <b>${esc(user.email || "")}</b> · ${chips.length} Blue Chip${chips.length === 1 ? "" : "s"}</span><button type="button" class="bbtn ghost" id="bcOut">Sign out</button></div>
-    <form class="bcform" id="bcAdd"><select id="bcLg" aria-label="League"><option${lg0 === "NFL" ? " selected" : ""}>NFL</option><option${lg0 === "NBA" ? " selected" : ""}>NBA</option></select>
-      <div class="bcsearch"><input type="text" id="bcName" placeholder="Search a player to add" aria-label="Search a player" autocomplete="off" maxlength="60" role="combobox" aria-expanded="false" aria-controls="bcSugg" aria-autocomplete="list">
-      <ul class="bcsugg" id="bcSugg" role="listbox" hidden></ul></div><button class="bbtn" type="submit">Add</button></form>${msg}`;
-  // search: names starting with what you typed come first (first or last name), then any other match, A to Z
-  const box = $("bcName"), sugg = $("bcSugg");
-  let hits = [], sel = -1;
-  const hl = (name, q) => { const i = name.toLowerCase().indexOf(q); return i < 0 ? esc(name) : esc(name.slice(0, i)) + "<mark>" + esc(name.slice(i, i + q.length)) + "</mark>" + esc(name.slice(i + q.length)); };
-  function showSugg(){
-    const q = box.value.trim().toLowerCase(), lg = $("bcLg").value;
-    if (!q) { sugg.hidden = true; box.setAttribute("aria-expanded", "false"); return; }
-    const pool = roster.filter(r => r.lg === lg && r.low.includes(q) && !isChip(r.lg, r.name));
-    const starts = r => r.low.startsWith(q) ? 0 : r.low.split(/[\s.'-]+/).some(w => w.startsWith(q)) ? 1 : 2;
-    hits = pool.sort((a, b) => starts(a) - starts(b) || a.name.localeCompare(b.name)).slice(0, 12);
-    sel = hits.length ? 0 : -1;
-    sugg.innerHTML = hits.length
-      ? hits.map((r, i) => `<li role="option" id="bcOpt${i}" data-i="${i}" aria-selected="${i === sel}"><span>${hl(r.name, q)}</span><small>${esc(r.team)}</small></li>`).join("")
-      : `<li class="none">No ${esc(lg)} player on today's board matches. Tap Add to save "${esc(box.value.trim())}" anyway.</li>`;
-    sugg.hidden = false; box.setAttribute("aria-expanded", "true");
-  }
-  function mark(){ sugg.querySelectorAll("li[data-i]").forEach(li => li.setAttribute("aria-selected", String(Number(li.dataset.i) === sel))); const el = $("bcOpt" + sel); if (el) el.scrollIntoView({block: "nearest"}); }
-  function pick(i){ const r = hits[i]; if (!r) return; sugg.hidden = true; box.value = ""; addChip(r.lg, r.name); }
-  box.addEventListener("input", showSugg);
-  box.addEventListener("focus", showSugg);
-  box.addEventListener("keydown", e => {
-    if (sugg.hidden || !hits.length) return;
-    if (e.key === "ArrowDown") { e.preventDefault(); sel = (sel + 1) % hits.length; mark(); }
-    else if (e.key === "ArrowUp") { e.preventDefault(); sel = (sel - 1 + hits.length) % hits.length; mark(); }
-    else if (e.key === "Enter" && sel >= 0) { e.preventDefault(); pick(sel); }
-    else if (e.key === "Escape") { sugg.hidden = true; }
-  });
-  sugg.addEventListener("pointerdown", e => { const li = e.target.closest("li[data-i]"); if (li) { e.preventDefault(); pick(Number(li.dataset.i)); } });
-  box.addEventListener("blur", () => setTimeout(() => { sugg.hidden = true; box.setAttribute("aria-expanded", "false"); }, 150));
-  $("bcLg").addEventListener("change", () => { if (box.value.trim()) showSugg(); });
-  $("bcAdd").addEventListener("submit", e => { e.preventDefault(); addChip($("bcLg").value, $("bcName").value); });
+    <p class="bcmsg">To add a player, tap the ☆ next to his name on the <a href="#board" style="color:var(--amber)">Board</a>.</p>${msg}`;
   $("bcOut").addEventListener("click", async () => { await sb.auth.signOut(); });
   list.innerHTML = !chipsLoaded ? `<div class="empty"><b>Loading your Blue Chips</b></div>`
     : chips.length ? `<div class="bcgrid">${chips.map(chipCard).join("")}</div>`
-    : `<div class="empty"><b>No Blue Chips yet</b>Add a player above, or tap ☆ next to any name on the board.</div>`;
+    : `<div class="empty"><b>No Blue Chips yet</b>Tap the ☆ next to any player's name on the <a href="#board" style="color:var(--amber)">Board</a> to add him here.</div>`;
   list.querySelectorAll("[data-unchip]").forEach(b => b.addEventListener("click", () => removeChip(b.dataset.unchip)));
 }
 if (sb) {
