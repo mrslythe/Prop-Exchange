@@ -255,7 +255,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 </header>
 
 <main class="gut">
-  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penalty-stocks" id="tabPenalty">Penalty Stocks</a><a href="#blue-chips" id="tabBlue">Blue Chips</a></nav>
+  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penny-blocks" id="tabPenalty">Penny Blocks</a><a href="#blue-chips" id="tabBlue">Blue Chips</a></nav>
   <div id="viewBoard" style="display:grid;gap:12px">
   <div class="legend" aria-label="Icon key"><span>🎂 Birthday today</span><span>😤 Revenge game: faces last season's team</span><span>🏠 Hometown: born within 35 miles of the arena</span><span>📍 Home state</span></div>
   <details class="record" id="record"><summary><span class="rtitle">Track record</span><span class="rstat">Loading results…</span></summary><div id="recordBody"></div></details>
@@ -272,7 +272,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Vegas %:</b> the chance the over price implies. Projected well above it is the better play.</li>
       <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
       <li><b>Injuries:</b> ⚠️ questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
-      <li><b>Penalty Stocks tab:</b> five parlays per sport from the top green calls, with links to build them on Hard Rock or PrizePicks.</li>
+      <li><b>Penny Blocks tab:</b> five parlays per sport from the top green calls, with links to build them on Hard Rock or PrizePicks.</li>
       <li><b>Blue Chips tab:</b> sign in with an emailed link, save the players you bet on (or tap ☆ on the board), and follow their props and recent results.</li>
       <li><b>Track record:</b> every call is graded after the game, so you can see how often green and red calls are right.</li>
       <li><b>Badges:</b> 🎂 birthday · 😤 faces last season's team · 🏠 born within 35 miles · 📍 home state.</li>
@@ -281,7 +281,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
   </details>
   </div>
   <section id="viewPenalty" hidden style="display:grid;gap:14px">
-    <p class="pnote"><b>Penalty Stocks</b> are five parlays per sport, built from the board's highest projected green calls for one stat each. One leg per player, no injured players, same-game legs allowed. They rebuild on every update.</p>
+    <p class="pnote"><b>Penny Blocks</b> are five parlays per sport, built from the board's highest projected green calls for one stat each. One leg per player, no injured players, same-game legs allowed. They rebuild on every update.</p>
     <div class="precord" id="precord">Parlay record loading…</div>
     <div class="pgrid" id="pgrid"><div class="empty"><b>Loading parlays</b>The parlays appear here after the board loads.</div></div>
     <p class="pnote"><b>Building it in the app:</b> "Hard Rock" and "PrizePicks" open their site or app; add the picks yourself. "Copy picks" puts the legs on your clipboard. Payouts use the best over price across sportsbooks, so Hard Rock's price can differ, and PrizePicks uses its own lines and payouts and may not offer every prop. <b>Combined chance</b> multiplies each leg's Projected %, so it assumes the legs are independent; same-game legs tend to win or lose together. For entertainment only. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
@@ -477,7 +477,7 @@ if (sb) {
 fetch("data/players.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(d => { playerHist = d; renderBlue(); }).catch(() => {});
 const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
 function showView(){
-  const v = location.hash === "#penalty-stocks" ? "penalty" : location.hash === "#blue-chips" ? "blue" : "board";
+  const v = (location.hash === "#penny-blocks" || location.hash === "#penalty-stocks") ? "penalty" : location.hash === "#blue-chips" ? "blue" : "board";
   [["board", "viewBoard", "tabBoard"], ["penalty", "viewPenalty", "tabPenalty"], ["blue", "viewBlue", "tabBlue"]].forEach(([k, view, tab]) => {
     $(view).hidden = v !== k; $(view).style.display = v === k ? "grid" : "none";
     $(tab).setAttribute("aria-current", v === k ? "page" : "false");

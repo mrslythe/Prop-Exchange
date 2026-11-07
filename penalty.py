@@ -1,4 +1,4 @@
-"""Penalty Stocks: five parlays per league built from the board's highest projected props.
+"""Penny Blocks: five parlays per league built from the board's highest projected props.
 
 Each parlay takes one stat, picks the props with the highest Projected % for it (one leg per
 player, green calls only, no injured players, same-game legs allowed), and prices the parlay from
