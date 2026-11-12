@@ -333,7 +333,6 @@ def summarize(data_dir, now):
         rec["latest"] = {"d": day, "picks": [
             {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"], "call": p["call"],
              "strong": p.get("strong", False), "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in calls]}
-    _write_players(data_dir, now)
     pars = _parlay_results(data_dir)
     done = [p for p in pars if p["res"] in ("won", "lost")]
     rec["parlays"] = {
