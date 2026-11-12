@@ -56,6 +56,25 @@ details[open] .caret{transform:rotate(90deg)}
 .gname em{font-style:normal;color:var(--muted);font-weight:500;padding:0 6px}
 .gmeta{grid-column:2/4;display:flex;flex-wrap:wrap;gap:4px 16px;color:var(--muted);font-size:12px}
 .gmeta b{color:var(--fg);font-weight:500}
+.glines{grid-column:2/4;display:flex;flex-wrap:wrap;gap:6px 10px;font-size:12px}
+.gl{display:inline-flex;gap:6px;align-items:center;border:1px solid var(--rule);border-radius:3px;padding:2px 8px;color:var(--muted)}
+.gl b{color:var(--fg);font-weight:600}
+.gl i{font-style:normal;font-weight:700;padding:0 6px;border-radius:2px}
+.gl i.u{background:var(--up);color:#04140b} .gl i.y{background:var(--amber);color:#1a1300} .gl i.d{background:var(--down);color:#1d0405}
+.gl i.st{box-shadow:0 0 0 2px var(--amber)}
+.sheet{display:grid;gap:12px}
+.shead{display:flex;flex-wrap:wrap;justify-content:space-between;gap:8px;align-items:baseline}
+.shead h2{margin:0;font-family:var(--cond);font-size:26px;letter-spacing:.04em;text-transform:uppercase;color:var(--amber)}
+.sgame{border:1px solid var(--rule);border-radius:4px;background:var(--panel);padding:10px 14px;display:grid;gap:6px;break-inside:avoid}
+.sgame .glines{grid-column:auto}
+.gl i{white-space:nowrap}
+.sgame h3{margin:0;font-family:var(--cond);font-size:19px;letter-spacing:.04em;text-transform:uppercase}
+.sgame h3 small{color:var(--muted);font-family:var(--mono, inherit);font-size:12px;letter-spacing:0;text-transform:none;margin-left:8px}
+.slist{display:flex;flex-wrap:wrap;gap:4px 14px;font-size:13px;margin:0;padding:0;list-style:none}
+.slist li b{font-weight:600}
+.slist .u{color:var(--up)} .slist .d{color:var(--down)}
+.slabel{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+@media print{header,.tabs,#viewBoard,#viewPenalty,#viewBlue,.noprint{display:none!important} body{background:#fff;color:#000} .sgame{background:#fff;border-color:#999} .slist .u{color:#06612e} .slist .d{color:#9b1c1c} .gl{color:#333;border-color:#999} .gl b{color:#000} .shead h2{color:#000}}
 .gcount{display:flex;gap:6px;font-weight:600}
 .pill{padding:2px 7px;border-radius:2px;font-size:12px}
 .pill.s{background:var(--panel2);color:var(--fg);border:1px solid var(--rule)}
@@ -254,7 +273,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 </header>
 
 <main class="gut">
-  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penny-blocks" id="tabPenalty">Penny Blocks</a><a href="#blue-chips" id="tabBlue">Blue Chips</a></nav>
+  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penny-blocks" id="tabPenalty">Penny Blocks</a><a href="#blue-chips" id="tabBlue">Blue Chips</a><a href="#daily-sheet" id="tabSheet">Daily Sheet</a></nav>
   <div id="viewBoard" style="display:grid;gap:12px">
   <div class="legend" aria-label="Icon key"><span>🎂 Birthday today</span><span>😤 Revenge game: faces last season's team</span><span>🏠 Hometown: born within 35 miles of the arena</span><span>📍 Home state</span></div>
   <details class="record" id="record"><summary><span class="rtitle">Track record</span><span class="rstat">Loading results…</span></summary><div id="recordBody"></div></details>
@@ -269,6 +288,8 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Form %:</b> 60% season hit rate + 40% last-5 hit rate over the line.</li>
       <li><b>Projected %:</b> 75% Form % + 25% the Vegas % of the over. <b>▲ OVER</b> (green) 58%+, <b>◆ LEAN</b> (yellow) 46–57%, <b>▼ UNDER</b> (red) 45% or less. <b>STRONG</b> = 70%+ over or 30% or less under.</li>
       <li><b>Line moves:</b> ▲/▼ under the line shows how far it moved since the board first saw it today. Rising usually means money on the over. The board refreshes hourly 10 AM–8 PM ET.</li>
+      <li><b>Game lines:</b> each game header shows a call on the total (how often each team's games went over that number, 60% season + 40% last 5, plus 25% Vegas) and on the spread (how often the away team would have covered and the home team failed to). Same colors; the spread names the likelier side.</li>
+      <li><b>Daily Sheet tab:</b> a one-page sheet of today's game-line calls, green overs and strong unders, printable and emailed daily.</li>
       <li><b>Anytime TD:</b> priced from Vegas alone and marked low confidence. 0.5 steals and blocks lines are left off.</li>
       <li><b>NFL matchup:</b> what today's defense allows this season to the player's position for that stat, ranked 1 (toughest) to 32. It nudges Form % up to 8 points either way.</li>
       <li><b>Vegas %:</b> the chance the over price implies. It makes up a quarter of Projected %.</li>
@@ -287,6 +308,9 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
     <div class="precord" id="precord">Parlay record loading…</div>
     <div class="pgrid" id="pgrid"><div class="empty"><b>Loading parlays</b>The parlays appear here after the board loads.</div></div>
     <p class="pnote"><b>Building it in the app:</b> "Hard Rock" and "PrizePicks" open their site or app; add the picks yourself. "Copy picks" puts the legs on your clipboard. Payouts use the best over price across sportsbooks, so Hard Rock's price can differ, and PrizePicks uses its own lines and payouts and may not offer every prop. <b>Combined chance</b> multiplies each leg's Projected %, so it assumes the legs are independent; same-game legs tend to win or lose together. For entertainment only. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
+  </section>
+  <section id="viewSheet" hidden style="display:grid;gap:14px">
+    <div class="sheet" id="sheet"><div class="empty"><b>Loading today's sheet</b>The Daily Sheet appears here after the board loads.</div></div>
   </section>
   <section id="viewBlue" hidden style="display:grid;gap:14px">
     <p class="pnote"><b>Blue Chips</b> are the players you usually bet on. Tap the ☆ next to any name on the board to save him here, and see their props today and how the board's calls on them have done lately.</p>
@@ -437,13 +461,27 @@ if (sb) {
 fetch("data/players.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(d => { playerHist = d; renderBlue(); }).catch(() => {});
 const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
 function showView(){
-  const v = (location.hash === "#penny-blocks" || location.hash === "#penalty-stocks") ? "penalty" : location.hash === "#blue-chips" ? "blue" : "board";
-  [["board", "viewBoard", "tabBoard"], ["penalty", "viewPenalty", "tabPenalty"], ["blue", "viewBlue", "tabBlue"]].forEach(([k, view, tab]) => {
+  const v = (location.hash === "#penny-blocks" || location.hash === "#penalty-stocks") ? "penalty" : location.hash === "#blue-chips" ? "blue" : location.hash === "#daily-sheet" ? "sheet" : "board";
+  [["board", "viewBoard", "tabBoard"], ["penalty", "viewPenalty", "tabPenalty"], ["blue", "viewBlue", "tabBlue"], ["sheet", "viewSheet", "tabSheet"]].forEach(([k, view, tab]) => {
     $(view).hidden = v !== k; $(view).style.display = v === k ? "grid" : "none";
     $(tab).setAttribute("aria-current", v === k ? "page" : "false");
   });
 }
 window.addEventListener("hashchange", showView);
+// game lines: total and spread calls for a game
+function glChips(ln){
+  if (!ln) return "";
+  const cls = c => c === "hit" ? "u" : c === "lean" ? "y" : "d";
+  const out = [];
+  const t = ln.total;
+  if (t) {
+    const word = t.call === "hit" ? "▲ OVER" : t.call === "lean" ? "◆ LEAN" : "▼ UNDER";
+    out.push(`<span class="gl" title="Form ${t.form}% · Vegas ${t.vegas ?? "—"}% · season game totals avg ${t.awayAvg} / ${t.homeAvg} · expected ${t.expected}">Total <b>${t.line}</b><i class="${cls(t.call)}${t.strong ? " st" : ""}">${word} ${t.proj}%</i>${t.strong ? "STRONG" : ""}</span>`);
+  }
+  const sp = ln.spread;
+  if (sp) out.push(`<span class="gl" title="Form ${sp.form}% (away covers ${sp.awayCover}% · home fails ${sp.homeFail}%) · Vegas ${sp.vegas ?? "—"}%">Spread <b>${esc(sp.pick)}</b><i class="${cls(sp.call)}${sp.strong ? " st" : ""}">${sp.call === "hit" ? "▲" : "◆"} ${sp.chance}%</i>${sp.strong ? "STRONG" : ""}</span>`);
+  return out.join("");
+}
 function pickText(par){
   return `Prop Exchange: ${par.league} ${par.stat} parlay (${par.american})\n` +
     par.legs.map(l => `${l.name} ${l.side === "under" ? "under" : "over"} ${l.line} ${par.stat === "Anytime TD" ? "(anytime TD)" : par.stat}`).join("\n");
@@ -458,6 +496,24 @@ async function copyPicks(btn, text){
   }
   setTimeout(() => { btn.textContent = "Copy picks"; }, 2500);
 }
+let sheetData = null;
+function renderSheet(){
+  const el = $("sheet"), d = sheetData;
+  if (!d) return;
+  const games = (d.games || []).filter(g => league === "ALL" || g.lg === league);
+  const day = new Date(d.date + "T12:00:00").toLocaleDateString([], {weekday: "long", month: "long", day: "numeric"});
+  const row = (r, under) => `<li><b>${esc(r.n)}</b> ${esc(r.s)} <span class="${under ? "d" : "u"}">${under ? "u" : "o"}${r.line} ${under ? "▼" : "▲"} ${r.proj}%${r.strong ? " ★" : ""}</span></li>`;
+  el.innerHTML = `<div class="shead"><h2>Daily Sheet · ${esc(day)}</h2><span class="rstat">Updated ${esc(new Date(d.updatedAt).toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}))} · games still to start · <button type="button" class="bbtn ghost noprint" id="sheetPrint">Print / save PDF</button></span></div>
+    <p class="pnote">Each game's total and spread call, its green OVER calls, and its strong UNDER calls (★ = strong). Projected % is the chance of the over. Emailed every day.</p>
+    ${games.length ? games.map(g => `<div class="sgame"><h3>${esc(g.game)}<small>${esc(g.lg)} · ${esc(when(g.start))}</small></h3>
+      ${g.lines && (g.lines.total || g.lines.spread) ? `<div class="glines">${glChips(g.lines)}</div>` : ""}
+      ${g.overs.length ? `<div><span class="slabel">Overs (green)</span><ul class="slist">${g.overs.map(r => row(r, false)).join("")}</ul></div>` : ""}
+      ${g.unders.length ? `<div><span class="slabel">Strong unders</span><ul class="slist">${g.unders.map(r => row(r, true)).join("")}</ul></div>` : ""}
+    </div>`).join("") : `<div class="empty"><b>No games left today</b>Tomorrow's sheet fills in once Vegas posts the lines.</div>`}
+    ${d.parlays?.length ? `<div class="sgame"><h3>Penny Blocks</h3><ul class="slist">${d.parlays.filter(p => league === "ALL" || p.league === league).map(p => `<li><b>${esc(p.league)} ${esc(p.stat)}</b> ${esc(p.american || "")}: ${p.legs.map(esc).join(", ")}</li>`).join("")}</ul></div>` : ""}`;
+  const pb = $("sheetPrint"); if (pb) pb.addEventListener("click", () => window.print());
+}
+fetch("data/sheet.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(d => { sheetData = d; renderSheet(); }).catch(() => {});
 function renderPenalty(){
   const list = parlays.filter(p => league === "ALL" || p.league === league);
   const pr = rec?.parlays;
@@ -539,7 +595,7 @@ function oddsTxt(o){ return o ? `${o.line} ${o.odds}` : "—"; }
 
 function render(){
   document.querySelectorAll("[data-lg]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lg === league)));
-  renderPenalty();
+  renderPenalty(); renderSheet();
   const list = games.filter(g => league === "ALL" || g.league === league).sort((a,b) => (a.start||"").localeCompare(b.start||""));
 
   // stat options
@@ -620,6 +676,7 @@ function render(){
           ${a.total?.v ? `<span>Total <b>${esc(a.total.v.replace(/^o/,""))}</b></span>` : ""}
           ${a.ml?.v || a.ml?.odds ? `<span>ML <b>${esc(a.abbr||a.name)} ${esc(a.ml.v||a.ml.odds)} / ${esc(h.abbr||h.name)} ${esc(h.ml?.v||h.ml?.odds||"")}</b></span>` : ""}
         </span>
+        ${g.lines ? `<span class="glines">${glChips(g.lines)}</span>` : ""}
       </summary>
       <div class="tbl">${rows ? `<table><thead><tr><th>Player / Stat</th><th>Line</th><th>Last 5 (old → new)</th><th>Last 5 avg</th><th>Season avg</th><th>Vegas %</th><th>Call</th></tr></thead><tbody>${rows}</tbody></table>`
         : `<div class="empty" style="margin:12px;border-color:var(--grid)">No props in this game match your filters.</div>`}</div>
@@ -673,6 +730,9 @@ function renderRecord(r){
   const st = Object.entries(r.byStat || {}).map(([k,v]) => [k, v.gN + v.rN, v.gHit + v.rHit]).filter(([,n]) => n >= 5)
     .sort((a,b) => b[1] - a[1]).slice(0, 12).map(([k,n,h]) => `<tr><td>${esc(k)}</td><td>${n}</td><td class="chg ${h/n >= .55 ? "u" : "d"}">${pctTxt(h,n)}</td></tr>`).join("");
   const dy = (r.days || []).slice(-10).reverse().map(d => `<tr><td>${esc(fmtD(d.d))}</td><td>${pctTxt(d.gHit,d.gN)} <span class="rstat">(${d.gHit}/${d.gN})</span>${plT(d, "g")}</td><td>${pctTxt(d.rHit,d.rN)} <span class="rstat">(${d.rHit}/${d.rN})</span>${plT(d, "r")}</td></tr>`).join("");
+  const gby = r.games?.by || {};
+  const gl = ["Total", "Spread"].flatMap(m => Object.entries(gby[m] || {}).map(([c, v]) =>
+    `<tr><td>${m} · ${c === "hit" ? "green" : c === "lean" ? "yellow" : "red"}</td><td>${v.hit}/${v.n} · ${pctTxt(v.hit, v.n)}</td><td>${v.B ? money(v.P) : "—"}</td></tr>`)).join("");
   const lt = r.latest ? r.latest.picks.slice(0, 40).map(p => {
     const ov = p.call !== "miss", right = p.r === (ov ? "over" : "under");
     return `<tr><td>${esc(p.n)} <span class="rstat">${esc(p.gl)}</span></td><td>${esc(p.s)} ${ov ? "o" : "u"}${p.line}${p.strong ? " ★" : ""}</td><td>${p.proj}%</td><td class="chg ${right ? "u" : "d"}">${p.a} ${right ? "✓" : "✗"}</td></tr>`;
@@ -682,6 +742,7 @@ function renderRecord(r){
     <div><h5>Does the projection hold up?</h5><table><thead><tr><th>Projected</th><th>Props</th><th>Actually went over</th></tr></thead><tbody>${bk}</tbody></table><p class="rstat" style="margin:6px 0 0">If the projection is honest, each row's real rate lands inside its range.</p></div>
     <div><h5>By day</h5><table><thead><tr><th>Day</th><th>Over calls</th><th>Under calls</th></tr></thead><tbody>${dy}</tbody></table></div>
     ${st ? `<div><h5>Calls by stat (5+ calls)</h5><table><thead><tr><th>Stat</th><th>Calls</th><th>Right</th></tr></thead><tbody>${st}</tbody></table></div>` : ""}
+    ${gl ? `<div><h5>Game lines (totals and spreads)</h5><table><thead><tr><th>Call</th><th>Right</th><th>$10 each</th></tr></thead><tbody>${gl}</tbody></table></div>` : ""}
     ${lt ? `<div class="wide"><h5>Latest results: calls from ${esc(fmtD(r.latest.d))}</h5><div class="tbl"><table><thead><tr><th>Player</th><th>Call</th><th>Projected</th><th>Final</th></tr></thead><tbody>${lt}</tbody></table></div></div>` : ""}
   </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Pushes and players who did not play are not counted. Over and Under counts are green and red calls; yellow leans are counted separately. <b>Dollar amounts</b> are the profit or loss from betting $10 on every call at the best price when it was saved (a win pays the odds, a loss costs $10). At standard −110 odds you need to win 52.4% just to break even. Red anytime-TD calls are left out: there is no "no TD" bet on the board. ★ = strong call. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>${old}`;
 }

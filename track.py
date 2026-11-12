@@ -344,6 +344,96 @@ def summarize(data_dir, now):
         "profit": round(sum(STAKE * ((_dec(p.get("american")) or 1) - 1) if p["res"] == "won" else -STAKE
                             for p in done), 2),
     }
+    rec["games"] = summarize_games(data_dir)
     with open(f"{data_dir}/record.json", "w") as f:
         json.dump(rec, f, separators=(",", ":"))
     return rec
+
+
+# ---------------- game lines (totals and spreads) ----------------
+def record_games(board, data_dir, now):
+    """Save each game's total and spread call (data/gamepicks/<date>.json) until the game starts."""
+    os.makedirs(f"{data_dir}/gamepicks", exist_ok=True)
+    files = {}
+    for g in board.get("games", []):
+        start = _start(g.get("start"))
+        ln = g.get("lines") or {}
+        if not ln or not start or start <= now or not g.get("espnEvent"):
+            continue
+        day = start.astimezone(ET).date().isoformat()
+        path = f"{data_dir}/gamepicks/{day}.json"
+        data = files.setdefault(path, _load(path))
+        a, h = (g.get("teams") or {}).get("away", {}), (g.get("teams") or {}).get("home", {})
+        base = {"lg": g["league"], "ev": g["espnEvent"], "gl": f"{a.get('name', '')} @ {h.get('name', '')}",
+                "st": g["start"], "home": g.get("espnHome"), "r": None, "a": None}
+        t = ln.get("total")
+        if t:
+            data["picks"][f"{g['league']}|{g['espnEvent']}|Total"] = {
+                **base, "s": "Total", "line": t["line"], "proj": t["proj"], "call": t["call"], "strong": t["strong"],
+                "side": "under" if t["call"] == "miss" else "over",
+                "odds": t["underOdds"] if t["call"] == "miss" else t["overOdds"],
+                "vg": t["vegasU"] if t["call"] == "miss" else t["vegas"]}
+        s = ln.get("spread")
+        if s:
+            data["picks"][f"{g['league']}|{g['espnEvent']}|Spread"] = {
+                **base, "s": "Spread", "line": s["line"], "proj": s["chance"], "call": s["call"], "strong": s["strong"],
+                "side": s["side"], "pick": s["pick"],
+                "odds": s["awayOdds"] if s["side"] == "away" else s["homeOdds"],
+                "vg": s["vegas"] if s["side"] == "away" else None}
+    for path, data in files.items():
+        _save(path, data)
+
+
+def grade_games(data_dir, now):
+    """Grade game picks from final scores: r = over/under/push (total) or away/home/push (spread)."""
+    import gamelines
+    cache, graded = {}, 0
+    for path in sorted(glob.glob(f"{data_dir}/gamepicks/*.json"))[-14:]:
+        data, changed = _load(path), False
+        for p in data["picks"].values():
+            start = _start(p.get("st"))
+            if p.get("r") or not start or now - start < GRADE_AFTER:
+                continue
+            sc = gamelines.final_score(p["lg"], p["ev"], p["home"], cache)
+            if sc is None:
+                if now - start > GIVE_UP_AFTER:
+                    p["r"] = "void"
+                    changed = True
+                continue
+            aw, hm = sc
+            if p["s"] == "Total":
+                tot = aw + hm
+                p["a"] = tot
+                p["r"] = "over" if tot > p["line"] else "under" if tot < p["line"] else "push"
+            else:
+                m = aw - hm + p["line"]  # away margin plus the away side's points
+                p["a"] = f"{aw:g}-{hm:g}"
+                p["r"] = "away" if m > 0 else "home" if m < 0 else "push"
+            changed = True
+            graded += 1
+        if changed:
+            _save(path, data)
+    return graded
+
+
+def summarize_games(data_dir):
+    """Record for game-line calls: per market and color, hits and $10 profit."""
+    out = {}
+    recent = []
+    for path in sorted(glob.glob(f"{data_dir}/gamepicks/*.json")):
+        day = os.path.basename(path)[:-5]
+        for p in _load(path)["picks"].values():
+            if p.get("r") in (None, "push", "void"):
+                continue
+            won = p["r"] == p["side"]
+            b = out.setdefault(p["s"], {}).setdefault(p["call"], {"n": 0, "hit": 0, "P": 0.0, "B": 0})
+            b["n"] += 1
+            b["hit"] += won
+            dec = _dec(p.get("odds"), p.get("vg"))
+            if dec:
+                b["P"] = round(b["P"] + (STAKE * (dec - 1) if won else -STAKE), 2)
+                b["B"] += 1
+            recent.append({"d": day, "lg": p["lg"], "gl": p["gl"], "s": p["s"], "call": p["call"],
+                           "pick": p.get("pick") or f"{p['side'].title()} {p['line']:g}", "proj": p["proj"],
+                           "a": p["a"], "won": won})
+    return {"by": out, "recent": recent[-20:][::-1]}

@@ -633,13 +633,21 @@ if __name__ == "__main__":
         print(f"{lg}: {len(data['games'])} games, {n} props, skipped {data.get('propsSkipped')}",
               data.get("error") or "")
     lines.apply(board, data_dir, now)
+    import gamelines
+    for lg in ("NFL", "NBA"):
+        try:
+            gamelines.build(board["games"], lg)
+        except Exception as e:  # game lines are extra: never block the board
+            print(f"{lg} game lines unavailable:", e, file=sys.stderr)
     import penalty
     board["parlays"] = penalty.build(board["games"])
+    import sheet
     os.makedirs(data_dir, exist_ok=True)
     if board["games"]:
         with open(out, "w") as f:
             json.dump(board, f, separators=(",", ":"))
         print(f"Wrote {out} ({os.path.getsize(out)//1024} KB)")
+        sheet.build(board, os.path.join(data_dir, "sheet.json"), now)
     else:
         # nothing usable: keep the previous board instead of blanking the site
         print("No games found in either league; board left unchanged.", file=sys.stderr)
@@ -647,7 +655,9 @@ if __name__ == "__main__":
     # results tracker: save today's calls, grade finished games, rebuild the track record
     saved = track.record_picks(board, data_dir, now)
     track.record_parlays(board, data_dir, now)
+    track.record_games(board, data_dir, now)
     graded = track.grade(data_dir, now)
+    graded += track.grade_games(data_dir, now)
     rec = track.summarize(data_dir, now)
     t = rec["total"]
     print(f"Tracker: {saved} picks saved, {graded} graded, {rec['pending']} pending; "

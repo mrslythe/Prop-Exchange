@@ -12,6 +12,8 @@ A daily board of NFL and NBA player props. For every game it lists the players w
 - **Projected %** (`proj`, `calib.py`) = 75% × Form % + 25% × the Vegas % of the over (a light blend).
 - **The call**: green **OVER** at 58%+, yellow **LEAN** at 46–57%, red **UNDER** at 45% or less. **STRONG** = 70%+ over or 30% or less under.
 - **Anytime TD** is priced from Vegas alone (yes price × 0.9), marked low confidence and never tagged strong. **0.5 lines on steals and blocks** are left off the board.
+- **Game lines** (`gamelines.py`): a call on each game's total and point spread. Total: for each team, how often its games this season and in its last 5 went over today's total (60/40), averaged over both teams, then 75% that + 25% the Vegas % of the over; same colors as props. Spread: how often the away team would have covered today's number and the home team failed to cover its side, same blend; the call names the likelier side (green 58%+, else yellow). Scores from ESPN team schedules. Saved in `data/gamepicks/` and graded from final scores; the track record shows them with $10 profit.
+- **Daily Sheet** (`sheet.py`, fourth tab): `data/sheet.json` lists, for today's games still to start, the game-line calls, the green OVER calls and the strong UNDER calls, plus Penny Blocks. Printable, and emailed daily by a scheduled agent.
 - **Line movement** (`lines.py`): the first line and prices seen for each prop are kept in `data/lines/<game date>.json`; each prop carries `open` and `move` (current line − opening line).
 - **NFL matchup** (`dvp.py`): every finished game's ESPN box score is credited to each player's position (QB, RB, WR, TE) and to the defense he faced (cached in `data/nfl_box/`). Each defense's per-game average allowed for the prop's stat is ranked 1 (toughest) to 32. Form % is nudged by 25 points per 100% above or below the league average, capped at ±8; the pre-matchup value is kept as `projBase`.
 - **Vegas %** is the chance implied by the sportsbook's over price, shown for comparison.
@@ -35,6 +37,8 @@ Five games is a small sample and ignores injuries, matchups and minutes. Treat i
 | `penalty.py` | Builds the Penny Blocks parlays from the board. |
 | `calib.py` | Projected % (form + light Vegas blend) and the green/yellow/red call. |
 | `lines.py` | Line movement: first line seen per prop (`data/lines/`). |
+| `gamelines.py` | Game total and spread calls, and final scores for grading them. |
+| `sheet.py` | Writes `data/sheet.json` for the Daily Sheet tab and email. |
 | `track.py` | Saves each call before its game and grades it afterward; writes `data/picks/` and `data/record.json`. |
 | `.github/workflows/update-board.yml` | Runs the builder and commits the new data. Started hourly 10 AM–8 PM Eastern by a cron-job.org timer (workflow_dispatch); GitHub's own 14:44 and 21:44 UTC schedules are a backup. Can also be run by hand from the Actions tab. |
 
