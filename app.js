@@ -1,3 +1,10 @@
+// Clickjacking guard: the page stays hidden unless it is the top window; if another site
+// frames it, the browser is sent to the real page instead.
+if (window.self === window.top) {
+  const g = document.getElementById("antiClickjack"); if (g) g.remove();
+} else {
+  try { window.top.location = window.self.location.href; } catch (e) { /* stays hidden */ }
+}
 const $ = id => document.getElementById(id);
 let league = "ALL", show = "all", statF = "", q = "";
 let run = null, games = [];
