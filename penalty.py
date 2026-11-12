@@ -1,9 +1,9 @@
-"""Penny Blocks: five parlays per league built from the board's highest projected props.
+"""Penny Blocks: five parlays per league built from the board's highest projected overs.
 
-Each parlay takes one stat and picks the strongest calls for it, overs or unders (one leg per
-player, no injured players, same-game legs allowed), ranked by how far the chance of that side beats the sportsbook's price. It is
-priced from each leg's best available odds for that side. Anytime TD has no "no" side on the board
-and is priced from Vegas alone, so its parlay is the likeliest scorers, marked low confidence.
+Each parlay takes one stat and picks the props with the highest Projected % for it: green OVER
+calls first, then yellow leans (one leg per player, no injured players, same-game legs allowed).
+It is priced from each leg's best available over odds. Anytime TD is priced from Vegas alone, so
+its parlay is the likeliest scorers, marked low confidence.
 """
 
 # (stat label, legs) per league. Same-game legs are allowed.
@@ -51,8 +51,8 @@ def build(games):
                             continue
                         c = x.get("call")
                         if x.get("low") and x.get("over"):
-                            c = "hit"  # Anytime TD: the likeliest scorers, whatever their call
-                        side = "over" if c == "hit" else "under" if c == "miss" else None
+                            c = "hit"  # Anytime TD: the likeliest scorers, whatever their color
+                        side = "over" if c in ("hit", "lean") else None
                         if not side or not x.get(side):
                             continue
                         dec = decimal_odds(x[side].get("odds"))
@@ -68,7 +68,7 @@ def build(games):
                             "strong": x.get("strong", False), "low": x.get("low", False),
                             "season": se, "l5": x["hits"],
                             # best value first: how far the chance beats the book's price, then the chance
-                            "_rank": (chance if x.get("low") else chance - (x.get("vegas" if side == "over" else "vegasU") or 0), chance),
+                            "_rank": (chance, se.get("n") or 0),
                         })
             cands.sort(key=lambda c: c["_rank"], reverse=True)
             legs, seen = [], set()

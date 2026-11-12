@@ -66,8 +66,8 @@ def record_picks(board, data_dir, now):
                     "n": pl["name"], "pid": pl["pid"], "s": x["stat"], "k": x.get("keys", []),
                     "line": x["line"], "proj": x["proj"], "call": x["call"], "vg": x.get("vegas"),
                     "inj": inj, "r": None, "a": None,
-                    # model v2 (Nov 12 2026): proj is the calibrated chance of the over, form the old %
-                    "v": 2, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
+                    # v3 (Nov 12 2026): green over 65%+, yellow lean 50-64%, red under below 50%
+                    "v": 3, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
                     "ol": (x.get("open") or {}).get("line"), "mv": x.get("move"),
                 }
     for path, data in files.items():
@@ -238,14 +238,17 @@ def summarize(data_dir, now):
         elif p["call"] == "miss":
             b["rN"] += 1
             b["rHit"] += p["r"] == "under"
+        elif p["call"] == "lean":
+            b["lN"] = b.get("lN", 0) + 1
+            b["lHit"] = b.get("lHit", 0) + (p["r"] == "over")
         if p.get("strong"):
             b["sN"] = b.get("sN", 0) + 1
             b["sHit"] = b.get("sHit", 0) + (p["r"] == ("over" if p["call"] == "hit" else "under"))
 
-    v1 = blank()  # the first model (Nov 6-12 2026), kept for comparison
+    v1 = blank()  # earlier versions (Nov 6-12 2026), kept for comparison
 
     total, by_league, by_stat, days = blank(), {}, {}, []
-    buckets = {k: {"n": 0, "over": 0} for k in ("0-34", "35-44", "45-54", "55-64", "65-100")}
+    buckets = {k: {"n": 0, "over": 0} for k in ("0-29", "30-49", "50-64", "65-69", "70-100")}
     week = blank()
     week_start = (now.astimezone(ET).date() - dt.timedelta(days=6)).isoformat()
     latest = None
@@ -260,7 +263,7 @@ def summarize(data_dir, now):
                 continue
             if p["r"] in ("dnp", "push") or p.get("inj") in OUT_STATUSES or p["call"] == "out":
                 continue  # no action: not counted either way
-            if p.get("v", 1) < 2:
+            if p.get("v", 1) < 3:
                 add(v1, p)
                 continue
             for b in (total, dayb, by_league.setdefault(p["lg"], blank()), by_stat.setdefault(f"{p['lg']} {p['s']}", blank())):
@@ -268,7 +271,7 @@ def summarize(data_dir, now):
             if day >= week_start:
                 add(week, p)
             pr = p["proj"]
-            bk = "0-34" if pr < 35 else "35-44" if pr < 45 else "45-54" if pr < 55 else "55-64" if pr < 65 else "65-100"
+            bk = "0-29" if pr < 30 else "30-49" if pr < 50 else "50-64" if pr < 65 else "65-69" if pr < 70 else "70-100"
             buckets[bk]["n"] += 1
             buckets[bk]["over"] += p["r"] == "over"
             graded_today.append(p)
@@ -287,7 +290,7 @@ def summarize(data_dir, now):
     }
     if latest:
         day, picks = latest
-        calls = sorted((p for p in picks if p["call"] in ("hit", "miss")), key=lambda p: -abs(p["proj"] - 50))
+        calls = sorted((p for p in picks if p["call"] in ("hit", "miss")), key=lambda p: -abs(p["proj"] - 50))  # green and red calls
         rec["latest"] = {"d": day, "picks": [
             {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"], "call": p["call"],
              "strong": p.get("strong", False), "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in calls]}
