@@ -10,7 +10,7 @@ A daily board of NFL and NBA player props. For every game it lists the players w
 - **Last 5 games and season stats** come from ESPN's public game logs (every game the player has played this season).
 - **Form %** (`form`) = 60% × season hit rate + 40% × last-5 hit rate, both against the same line. With fewer than 5 games this season it leans on the last 5, which reach back into last season.
 - **Projected %** (`proj`, `calib.py`) = 75% × Form % + 25% × the Vegas % of the over (a light blend).
-- **The call**: green **OVER** at 65%+, yellow **LEAN** (leans over) at 50–64%, red **UNDER** below 50%. **STRONG** = 70%+ over or 30% or less under.
+- **The call**: green **OVER** at 58%+, yellow **LEAN** at 46–57%, red **UNDER** at 45% or less. **STRONG** = 70%+ over or 30% or less under.
 - **Anytime TD** is priced from Vegas alone (yes price × 0.9), marked low confidence and never tagged strong. **0.5 lines on steals and blocks** are left off the board.
 - **Line movement** (`lines.py`): the first line and prices seen for each prop are kept in `data/lines/<game date>.json`; each prop carries `open` and `move` (current line − opening line).
 - **NFL matchup** (`dvp.py`): every finished game's ESPN box score is credited to each player's position (QB, RB, WR, TE) and to the defense he faced (cached in `data/nfl_box/`). Each defense's per-game average allowed for the prop's stat is ranked 1 (toughest) to 32. Form % is nudged by 25 points per 100% above or below the league average, capped at ±8; the pre-matchup value is kept as `projBase`.

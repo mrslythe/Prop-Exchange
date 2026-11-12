@@ -604,7 +604,7 @@ def build(league):
         "league": league.upper(),
         "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games, season and career stats: ESPN game logs.",
-        "rule": "Form % = 60% season hit rate + 40% last-5 hit rate against the consensus line. Projected % = 75% Form % + 25% Vegas %. Green OVER 65%+, yellow LEAN 50-64%, red UNDER below 50%.",
+        "rule": "Form % = 60% season hit rate + 40% last-5 hit rate against the consensus line. Projected % = 75% Form % + 25% Vegas %. Green OVER 58%+, yellow LEAN 46-57%, red UNDER 45% or less.",
         "propsSeen": len(props), "propsSkipped": skipped,
         "games": out_games,
     }

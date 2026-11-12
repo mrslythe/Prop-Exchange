@@ -267,7 +267,7 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
     <ul>
       <li><b>Line:</b> consensus from scoresandodds.com (midpoint of the best over and under).</li>
       <li><b>Form %:</b> 60% season hit rate + 40% last-5 hit rate over the line.</li>
-      <li><b>Projected %:</b> 75% Form % + 25% the Vegas % of the over. <b>▲ OVER</b> (green) 65%+, <b>◆ LEAN</b> (yellow) 50–64%, <b>▼ UNDER</b> (red) below 50%. <b>STRONG</b> = 70%+ over or 30% or less under.</li>
+      <li><b>Projected %:</b> 75% Form % + 25% the Vegas % of the over. <b>▲ OVER</b> (green) 58%+, <b>◆ LEAN</b> (yellow) 46–57%, <b>▼ UNDER</b> (red) 45% or less. <b>STRONG</b> = 70%+ over or 30% or less under.</li>
       <li><b>Line moves:</b> ▲/▼ under the line shows how far it moved since the board first saw it today. Rising usually means money on the over. The board refreshes hourly 10 AM–8 PM ET.</li>
       <li><b>Anytime TD:</b> priced from Vegas alone and marked low confidence. 0.5 steals and blocks lines are left off.</li>
       <li><b>NFL matchup:</b> what today's defense allows this season to the player's position for that stat, ranked 1 (toughest) to 32. It nudges Form % up to 8 points either way.</li>
@@ -521,11 +521,11 @@ function keep(p){
   return true;
 }
 const proj = x => x.proj ?? x.pct;
-// the call box: green OVER 65%+, yellow LEAN 50-64%, red UNDER below 50%. proj = Projected % (the over).
+// the call box: green OVER, yellow LEAN, red UNDER (thresholds in calib.py). proj = Projected % (the over).
 function callBox(x){
   const st = x.strong ? ` class="st"` : "", tag = x.strong ? `<b class="stg">STRONG</b>` : "";
   if (x.call === "hit") return `<td class="hit u"><span${st}>▲ OVER ${proj(x)}%${tag}</span>`;
-  if (x.call === "lean") return `<td class="hit y"><span title="Leans over: 50-64%">◆ LEAN ${proj(x)}%</span>`;
+  if (x.call === "lean") return `<td class="hit y"><span title="Lean: 46-57%">◆ LEAN ${proj(x)}%</span>`;
   return `<td class="hit d"><span${st}>▼ UNDER ${proj(x)}%${tag}</span>`;
 }
 function moveTxt(x){
@@ -648,7 +648,7 @@ const pctTxt = (h, n) => n ? Math.round(100 * h / n) + "%" : "—";
 function renderRecord(r){
   const sum = document.querySelector("#record .rstat"), body = $("recordBody");
   const t = r.total || {}, v1 = r.v1 || {};
-  const old = v1.gN || v1.rN ? `<p class="rnote"><b>Earlier versions (Nov 6–12):</b> green calls hit ${pctTxt(v1.gHit, v1.gN)} (${v1.gHit}/${v1.gN}), red calls went under ${pctTxt(v1.rHit, v1.rN)} (${v1.rHit}/${v1.rN}). The track record above counts the current version (green 65%+, yellow 50–64%, red below 50%) from Nov 12 on.</p>` : "";
+  const old = v1.gN || v1.rN ? `<p class="rnote"><b>Earlier versions (Nov 6–12):</b> green calls hit ${pctTxt(v1.gHit, v1.gN)} (${v1.gHit}/${v1.gN}), red calls went under ${pctTxt(v1.rHit, v1.rN)} (${v1.rHit}/${v1.rN}). The track record above counts the current version (green 58%+, yellow 46–57%, red 45% or less) from Nov 12 on.</p>` : "";
   if (!t.gN && !t.rN) {
     sum.innerHTML = `Current version: no graded games yet. ${r.pending ? `<b>${r.pending}</b> calls are waiting for their games to finish.` : ""}`;
     body.innerHTML = `<p class="rnote">Every call is saved just before its game starts and graded against the player's final stat once the game is over. Pushes and players who did not play are left out. Results show up here after the first games finish.</p>${old}`;

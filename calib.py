@@ -3,13 +3,13 @@
     Form %      = 60% season hit rate + 40% last-5 hit rate over the line (+ NFL matchup nudge)
     Projected % = 75% Form % + 25% Vegas % of the over (a light blend, so lopsided prices pull a bit)
 
-    Green  OVER   65%+
-    Yellow LEAN   50-64%  (leans over; shown and tracked, not a full call)
-    Red    UNDER  below 50%
+    Green  OVER   58%+
+    Yellow LEAN   46-57%  (shown and tracked, not a full call)
+    Red    UNDER  45% or less
     STRONG        70%+ over, or 30% or less under
 """
 VEGAS_WEIGHT = 0.25
-GREEN, YELLOW = 65, 50
+GREEN, YELLOW = 58, 46
 STRONG_OVER, STRONG_UNDER = 70, 30
 LOW_CONF = {"Anytime TD"}          # priced from Vegas alone, marked low confidence
 DROP_HALF = {"Steals", "Blocks"}   # 0.5 lines on these are taken off the board

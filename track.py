@@ -66,7 +66,7 @@ def record_picks(board, data_dir, now):
                     "n": pl["name"], "pid": pl["pid"], "s": x["stat"], "k": x.get("keys", []),
                     "line": x["line"], "proj": x["proj"], "call": x["call"], "vg": x.get("vegas"),
                     "inj": inj, "r": None, "a": None,
-                    # v3 (Nov 12 2026): green over 65%+, yellow lean 50-64%, red under below 50%
+                    # v3 (Nov 12 2026): green over, yellow lean, red under (thresholds in calib.py)
                     "v": 3, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
                     "ol": (x.get("open") or {}).get("line"), "mv": x.get("move"),
                 }
@@ -248,7 +248,7 @@ def summarize(data_dir, now):
     v1 = blank()  # earlier versions (Nov 6-12 2026), kept for comparison
 
     total, by_league, by_stat, days = blank(), {}, {}, []
-    buckets = {k: {"n": 0, "over": 0} for k in ("0-29", "30-49", "50-64", "65-69", "70-100")}
+    buckets = {k: {"n": 0, "over": 0} for k in ("0-29", "30-45", "46-57", "58-69", "70-100")}
     week = blank()
     week_start = (now.astimezone(ET).date() - dt.timedelta(days=6)).isoformat()
     latest = None
@@ -271,7 +271,7 @@ def summarize(data_dir, now):
             if day >= week_start:
                 add(week, p)
             pr = p["proj"]
-            bk = "0-29" if pr < 30 else "30-49" if pr < 50 else "50-64" if pr < 65 else "65-69" if pr < 70 else "70-100"
+            bk = "0-29" if pr < 30 else "30-45" if pr < 46 else "46-57" if pr < 58 else "58-69" if pr < 70 else "70-100"
             buckets[bk]["n"] += 1
             buckets[bk]["over"] += p["r"] == "over"
             graded_today.append(p)
