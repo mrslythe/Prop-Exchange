@@ -462,7 +462,7 @@ function renderPenalty(){
   const list = parlays.filter(p => league === "ALL" || p.league === league);
   const pr = rec?.parlays;
   $("precord").innerHTML = pr && pr.n
-    ? `<span>Parlay record <b>${pr.won} of ${pr.n} hit</b> (${Math.round(100*pr.won/pr.n)}%)</span>${pr.pending ? `<span>${pr.pending} waiting on games</span>` : ""}<span class="precent">${(pr.recent||[]).slice(0,10).map(p => `<span class="${p.res === "won" ? "w" : p.res === "lost" ? "l" : ""}" title="${esc(p.d)}">${esc(p.lg)} ${esc(p.s)} ${p.res === "won" ? "✓ " + esc(p.american||"") : p.res === "lost" ? "✗" : "void"}</span>`).join("")}</span>`
+    ? `<span>Parlay record <b>${pr.won} of ${pr.n} hit</b> (${Math.round(100*pr.won/pr.n)}%)${pr.profit != null ? ` · ${money(pr.profit)} betting $10 on each` : ""}</span>${pr.pending ? `<span>${pr.pending} waiting on games</span>` : ""}<span class="precent">${(pr.recent||[]).slice(0,10).map(p => `<span class="${p.res === "won" ? "w" : p.res === "lost" ? "l" : ""}" title="${esc(p.d)}">${esc(p.lg)} ${esc(p.s)} ${p.res === "won" ? "✓ " + esc(p.american||"") : p.res === "lost" ? "✗" : "void"}</span>`).join("")}</span>`
     : `<span>No parlays graded yet. ${pr?.pending ? `<b>${pr.pending}</b> saved and waiting on their games.` : "Each parlay is saved before its first leg starts and graded after the games."}</span>`;
   if (!list.length) { $("pgrid").innerHTML = `<div class="empty"><b>No parlays right now</b>The next update builds new ones once Vegas posts props.</div>`; return; }
   $("pgrid").innerHTML = list.map((par, i) => {
@@ -645,6 +645,10 @@ function render(){
 }
 
 const pctTxt = (h, n) => n ? Math.round(100 * h / n) + "%" : "—";
+// profit on $10 bets: green, or red with a minus sign
+const money = v => v == null ? "" : `<b class="${v >= 0 ? "u" : "d"}">${v >= 0 ? "+" : "−"}$${Math.abs(v).toFixed(2)}</b>`;
+const pl = (b, k) => b && b[k + "B"] ? ` · ${money(b[k + "P"])}` : "";
+const plT = (b, k) => b && b[k + "B"] ? `<div class="rstat">${money(b[k + "P"])}</div>` : "";  // in tables: own line
 function renderRecord(r){
   const sum = document.querySelector("#record .rstat"), body = $("recordBody");
   const t = r.total || {}, v1 = r.v1 || {};
@@ -655,19 +659,20 @@ function renderRecord(r){
     return;
   }
   const w = r.week || {}, cls = (h, n) => n && h / n >= .5 ? "u" : "d";
-  sum.innerHTML = `<span>Over calls hit <b class="${cls(t.gHit, t.gN)}">${pctTxt(t.gHit, t.gN)}</b> (${t.gHit}/${t.gN})</span>
-    ${t.lN ? `<span>Leans went over <b class="${cls(t.lHit, t.lN)}">${pctTxt(t.lHit, t.lN)}</b> (${t.lHit}/${t.lN})</span>` : ""}
-    <span>Under calls hit <b class="${cls(t.rHit, t.rN)}">${pctTxt(t.rHit, t.rN)}</b> (${t.rHit}/${t.rN})</span>
-    ${t.sN ? `<span>Strong calls <b class="${cls(t.sHit, t.sN)}">${pctTxt(t.sHit, t.sN)}</b> (${t.sHit}/${t.sN})</span>` : ""}
-    <span>Last 7 days <b>${pctTxt((w.gHit||0) + (w.rHit||0), (w.gN||0) + (w.rN||0))}</b></span>`;
-  const lg = Object.entries(r.byLeague || {}).map(([k,v]) => `<tr><td>${esc(k)}</td><td>${pctTxt(v.gHit,v.gN)} <span class="rstat">(${v.gHit}/${v.gN})</span></td><td>${pctTxt(v.rHit,v.rN)} <span class="rstat">(${v.rHit}/${v.rN})</span></td></tr>`).join("");
+  const wp = (w.gP || 0) + (w.rP || 0), wb = (w.gB || 0) + (w.rB || 0);
+  sum.innerHTML = `<span>Over calls hit <b class="${cls(t.gHit, t.gN)}">${pctTxt(t.gHit, t.gN)}</b> (${t.gHit}/${t.gN})${pl(t, "g")}</span>
+    ${t.lN ? `<span>Leans went over <b class="${cls(t.lHit, t.lN)}">${pctTxt(t.lHit, t.lN)}</b> (${t.lHit}/${t.lN})${pl(t, "l")}</span>` : ""}
+    <span>Under calls hit <b class="${cls(t.rHit, t.rN)}">${pctTxt(t.rHit, t.rN)}</b> (${t.rHit}/${t.rN})${pl(t, "r")}</span>
+    ${t.sN ? `<span>Strong calls <b class="${cls(t.sHit, t.sN)}">${pctTxt(t.sHit, t.sN)}</b> (${t.sHit}/${t.sN})${pl(t, "s")}</span>` : ""}
+    <span>Last 7 days <b>${pctTxt((w.gHit||0) + (w.rHit||0), (w.gN||0) + (w.rN||0))}</b>${wb ? ` · ${money(wp)}` : ""}</span>`;
+  const lg = Object.entries(r.byLeague || {}).map(([k,v]) => `<tr><td>${esc(k)}</td><td>${pctTxt(v.gHit,v.gN)} <span class="rstat">(${v.gHit}/${v.gN})</span>${plT(v, "g")}</td><td>${pctTxt(v.rHit,v.rN)} <span class="rstat">(${v.rHit}/${v.rN})</span>${plT(v, "r")}</td></tr>`).join("");
   const bk = Object.entries(r.buckets || {}).filter(([,v]) => v.n).map(([k,v]) => {
     const pc = Math.round(100*v.over/v.n);
     return `<tr><td>${esc(k)}%</td><td>${v.n}</td><td>${pc}% <span class="rbar" style="width:${Math.max(2, pc*0.8)}px"></span></td></tr>`;
   }).join("");
   const st = Object.entries(r.byStat || {}).map(([k,v]) => [k, v.gN + v.rN, v.gHit + v.rHit]).filter(([,n]) => n >= 5)
     .sort((a,b) => b[1] - a[1]).slice(0, 12).map(([k,n,h]) => `<tr><td>${esc(k)}</td><td>${n}</td><td class="chg ${h/n >= .55 ? "u" : "d"}">${pctTxt(h,n)}</td></tr>`).join("");
-  const dy = (r.days || []).slice(-10).reverse().map(d => `<tr><td>${esc(fmtD(d.d))}</td><td>${pctTxt(d.gHit,d.gN)} <span class="rstat">(${d.gHit}/${d.gN})</span></td><td>${pctTxt(d.rHit,d.rN)} <span class="rstat">(${d.rHit}/${d.rN})</span></td></tr>`).join("");
+  const dy = (r.days || []).slice(-10).reverse().map(d => `<tr><td>${esc(fmtD(d.d))}</td><td>${pctTxt(d.gHit,d.gN)} <span class="rstat">(${d.gHit}/${d.gN})</span>${plT(d, "g")}</td><td>${pctTxt(d.rHit,d.rN)} <span class="rstat">(${d.rHit}/${d.rN})</span>${plT(d, "r")}</td></tr>`).join("");
   const lt = r.latest ? r.latest.picks.slice(0, 40).map(p => {
     const ov = p.call !== "miss", right = p.r === (ov ? "over" : "under");
     return `<tr><td>${esc(p.n)} <span class="rstat">${esc(p.gl)}</span></td><td>${esc(p.s)} ${ov ? "o" : "u"}${p.line}${p.strong ? " ★" : ""}</td><td>${p.proj}%</td><td class="chg ${right ? "u" : "d"}">${p.a} ${right ? "✓" : "✗"}</td></tr>`;
@@ -678,7 +683,7 @@ function renderRecord(r){
     <div><h5>By day</h5><table><thead><tr><th>Day</th><th>Over calls</th><th>Under calls</th></tr></thead><tbody>${dy}</tbody></table></div>
     ${st ? `<div><h5>Calls by stat (5+ calls)</h5><table><thead><tr><th>Stat</th><th>Calls</th><th>Right</th></tr></thead><tbody>${st}</tbody></table></div>` : ""}
     ${lt ? `<div class="wide"><h5>Latest results: calls from ${esc(fmtD(r.latest.d))}</h5><div class="tbl"><table><thead><tr><th>Player</th><th>Call</th><th>Projected</th><th>Final</th></tr></thead><tbody>${lt}</tbody></table></div></div>` : ""}
-  </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Pushes and players who did not play are not counted. Over and Under counts are green and red calls; yellow leans are counted separately. ★ = strong call. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>${old}`;
+  </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Pushes and players who did not play are not counted. Over and Under counts are green and red calls; yellow leans are counted separately. <b>Dollar amounts</b> are the profit or loss from betting $10 on every call at the best price when it was saved (a win pays the odds, a loss costs $10). At standard −110 odds you need to win 52.4% just to break even. Red anytime-TD calls are left out: there is no "no TD" bet on the board. ★ = strong call. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>${old}`;
 }
 fetch("data/record.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(r => {
   if (r) { rec = r; renderRecord(r); renderPenalty(); } else document.querySelector("#record .rstat").textContent = "Results will appear after the first games are graded.";

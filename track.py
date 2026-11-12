@@ -22,6 +22,30 @@ GIVE_UP_AFTER = dt.timedelta(days=3)  # no stat line by then: the player did not
 OUT_STATUSES = {"Out", "Injured Reserve", "Doubtful", "Suspension"}
 
 
+STAKE = 10  # the profit tracker bets $10 on every call
+
+
+def _dec(odds=None, implied=None):
+    """Decimal odds from American odds ("-110", "+150", "even"), else from the implied % (vig included)."""
+    o = str(odds or "").strip().lower()
+    if o in ("even", "ev", "+100", "100"):
+        return 2.0
+    v = num(o.replace("+", "")) if o else None
+    if v:
+        return 1 + (v / 100 if v > 0 else 100 / -v)
+    if implied and 0 < implied < 100:
+        return 100 / implied
+    return None
+
+
+def _profit(p, side):
+    """$10 on this pick's side at its saved price: win pays the odds, a loss costs $10."""
+    dec = _dec(p.get("oo"), p.get("vg")) if side == "over" else _dec(p.get("uo"), p.get("vu"))
+    if not dec:
+        return None
+    return round(STAKE * (dec - 1), 2) if p["r"] == side else -STAKE
+
+
 def _start(iso):
     return dt.datetime.fromisoformat(iso.replace("Z", "+00:00")) if iso else None
 
@@ -68,6 +92,7 @@ def record_picks(board, data_dir, now):
                     "inj": inj, "r": None, "a": None,
                     # v3 (Nov 12 2026): green over, yellow lean, red under (thresholds in calib.py)
                     "v": 3, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
+                    "oo": (x.get("over") or {}).get("odds"), "uo": (x.get("under") or {}).get("odds"),
                     "ol": (x.get("open") or {}).get("line"), "mv": x.get("move"),
                 }
     for path, data in files.items():
@@ -231,7 +256,20 @@ def summarize(data_dir, now):
     def blank():
         return {"gN": 0, "gHit": 0, "rN": 0, "rHit": 0}
 
+    def money(b, k, p, side):
+        pr = _profit(p, side)
+        if pr is not None:
+            b[k + "P"] = round(b.get(k + "P", 0) + pr, 2)
+            b[k + "B"] = b.get(k + "B", 0) + 1  # bets that had a price
+
     def add(b, p):
+        if p["call"] == "miss" and p["s"] == "Anytime TD":
+            return  # no "no TD" bet on the board: a red TD call is not an Under pick
+        side = "over" if p["call"] in ("hit", "lean") else "under"
+        if p.get("v", 1) >= 3 and p["call"] in ("hit", "miss", "lean"):
+            money(b, {"hit": "g", "miss": "r", "lean": "l"}[p["call"]], p, side)
+            if p.get("strong"):
+                money(b, "s", p, side)
         if p["call"] == "hit":
             b["gN"] += 1
             b["gHit"] += p["r"] == "over"
@@ -290,7 +328,8 @@ def summarize(data_dir, now):
     }
     if latest:
         day, picks = latest
-        calls = sorted((p for p in picks if p["call"] in ("hit", "miss")), key=lambda p: -abs(p["proj"] - 50))  # green and red calls
+        calls = sorted((p for p in picks if p["call"] in ("hit", "miss")
+                        and not (p["call"] == "miss" and p["s"] == "Anytime TD")), key=lambda p: -abs(p["proj"] - 50))  # green and red calls
         rec["latest"] = {"d": day, "picks": [
             {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"], "call": p["call"],
              "strong": p.get("strong", False), "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in calls]}
@@ -301,6 +340,9 @@ def summarize(data_dir, now):
         "n": len(done), "won": sum(p["res"] == "won" for p in done),
         "pending": sum(p["res"] == "pending" for p in pars),
         "recent": [p for p in pars if p["res"] != "pending"][-15:][::-1],
+        # $10 on every parlay at its saved price (a leg that pushed or did not play is not repriced)
+        "profit": round(sum(STAKE * ((_dec(p.get("american")) or 1) - 1) if p["res"] == "won" else -STAKE
+                            for p in done), 2),
     }
     with open(f"{data_dir}/record.json", "w") as f:
         json.dump(rec, f, separators=(",", ":"))
