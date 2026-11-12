@@ -66,6 +66,9 @@ def record_picks(board, data_dir, now):
                     "n": pl["name"], "pid": pl["pid"], "s": x["stat"], "k": x.get("keys", []),
                     "line": x["line"], "proj": x["proj"], "call": x["call"], "vg": x.get("vegas"),
                     "inj": inj, "r": None, "a": None,
+                    # model v2 (Nov 12 2026): proj is the calibrated chance of the over, form the old %
+                    "v": 2, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
+                    "ol": (x.get("open") or {}).get("line"), "mv": x.get("move"),
                 }
     for path, data in files.items():
         _save(path, data)
@@ -92,7 +95,8 @@ def record_parlays(board, data_dir, now):
             "id": par["id"], "lg": par["league"], "s": par["stat"], "first": first.isoformat(),
             "american": par.get("american"), "proj": par.get("proj"), "implied": par.get("implied"),
             "legs": [{"key": f"{par['league']}|{l['event']}|{l['pid']}|{par['stat']}", "n": l["name"],
-                      "line": l["line"], "odds": l["odds"], "proj": l["proj"]} for l in legs],
+                      "side": l.get("side", "over"), "line": l["line"], "odds": l["odds"], "proj": l["proj"]}
+                     for l in legs],
         }
         _save(path, {"picks": data.get("picks", {}), "parlays": data["parlays"]})
         saved += 1
@@ -101,7 +105,7 @@ def record_parlays(board, data_dir, now):
 
 def _parlay_results(data_dir):
     """Grade saved parlays from their legs' pick results. A push or did-not-play leg drops out,
-    as sportsbooks do; the parlay wins if every remaining leg went over."""
+    as sportsbooks do; the parlay wins if every remaining leg landed on its side (over or under)."""
     results = {}
     for path in sorted(glob.glob(f"{data_dir}/picks/*.json")):
         for key, p in _load(path)["picks"].items():
@@ -112,16 +116,17 @@ def _parlay_results(data_dir):
         for par in (_load(path).get("parlays") or {}).values():
             legs = [results.get(l["key"]) for l in par["legs"]]
             rs = [(p or {}).get("r") for p in legs]
-            if any(r == "under" for r in rs):
+            sides = [l.get("side", "over") for l in par["legs"]]
+            if any(r in ("over", "under") and r != sd for r, sd in zip(rs, sides)):
                 res = "lost"
             elif any(r is None for r in rs):
                 res = "pending"
             else:
-                live = [r for r in rs if r == "over"]
+                live = [r for r in rs if r in ("over", "under")]
                 res = "won" if live else "void"
             out.append({"d": day, "id": par["id"], "lg": par["lg"], "s": par["s"], "american": par.get("american"),
                         "proj": par.get("proj"), "res": res,
-                        "legs": [{"n": l["n"], "line": l["line"], "r": r, "a": (p or {}).get("a")}
+                        "legs": [{"n": l["n"], "side": l.get("side", "over"), "line": l["line"], "r": r, "a": (p or {}).get("a")}
                                  for l, p, r in zip(par["legs"], legs, rs)]})
     return out
 
@@ -141,9 +146,9 @@ def _write_players(data_dir, now, days=30, keep=15):
             e = out.setdefault(k, {"n": 0, "over": 0, "gN": 0, "gHit": 0, "recent": []})
             e["n"] += 1
             e["over"] += p["r"] == "over"
-            if p["call"] == "hit":
+            if p["call"] in ("hit", "miss"):  # calls the board got right, over or under
                 e["gN"] += 1
-                e["gHit"] += p["r"] == "over"
+                e["gHit"] += p["r"] == ("over" if p["call"] == "hit" else "under")
             e["recent"].append({"d": day, "s": p["s"], "line": p["line"], "a": p["a"], "r": p["r"], "call": p["call"]})
     for e in out.values():
         e["recent"] = sorted(e["recent"], key=lambda x: x["d"], reverse=True)[:keep]
@@ -233,9 +238,14 @@ def summarize(data_dir, now):
         elif p["call"] == "miss":
             b["rN"] += 1
             b["rHit"] += p["r"] == "under"
+        if p.get("strong"):
+            b["sN"] = b.get("sN", 0) + 1
+            b["sHit"] = b.get("sHit", 0) + (p["r"] == ("over" if p["call"] == "hit" else "under"))
+
+    v1 = blank()  # the first model (Nov 6-12 2026), kept for comparison
 
     total, by_league, by_stat, days = blank(), {}, {}, []
-    buckets = {k: {"n": 0, "over": 0} for k in ("0-34", "35-54", "55-64", "65-74", "75-100")}
+    buckets = {k: {"n": 0, "over": 0} for k in ("0-34", "35-44", "45-54", "55-64", "65-100")}
     week = blank()
     week_start = (now.astimezone(ET).date() - dt.timedelta(days=6)).isoformat()
     latest = None
@@ -250,12 +260,15 @@ def summarize(data_dir, now):
                 continue
             if p["r"] in ("dnp", "push") or p.get("inj") in OUT_STATUSES or p["call"] == "out":
                 continue  # no action: not counted either way
+            if p.get("v", 1) < 2:
+                add(v1, p)
+                continue
             for b in (total, dayb, by_league.setdefault(p["lg"], blank()), by_stat.setdefault(f"{p['lg']} {p['s']}", blank())):
                 add(b, p)
             if day >= week_start:
                 add(week, p)
             pr = p["proj"]
-            bk = "0-34" if pr < 35 else "35-54" if pr < 55 else "55-64" if pr < 65 else "65-74" if pr < 75 else "75-100"
+            bk = "0-34" if pr < 35 else "35-44" if pr < 45 else "45-54" if pr < 55 else "55-64" if pr < 65 else "65-100"
             buckets[bk]["n"] += 1
             buckets[bk]["over"] += p["r"] == "over"
             graded_today.append(p)
@@ -270,13 +283,14 @@ def summarize(data_dir, now):
         "buckets": buckets,
         "days": days[-30:],
         "latest": None,
+        "v1": v1,
     }
     if latest:
         day, picks = latest
-        greens = sorted((p for p in picks if p["call"] == "hit"), key=lambda p: -p["proj"])
+        calls = sorted((p for p in picks if p["call"] in ("hit", "miss")), key=lambda p: -abs(p["proj"] - 50))
         rec["latest"] = {"d": day, "picks": [
-            {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"],
-             "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in greens]}
+            {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"], "call": p["call"],
+             "strong": p.get("strong", False), "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in calls]}
     _write_players(data_dir, now)
     pars = _parlay_results(data_dir)
     done = [p for p in pars if p["res"] in ("won", "lost")]

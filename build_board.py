@@ -452,7 +452,9 @@ def versus(career, person, game, teams):
     }
 
 
-def build(league):
+def build(league, coef=None):
+    import calib
+    coef = coef or calib.DEFAULT[league.upper()]
     games = parse_games(league)
     props = []
     with cf.ThreadPoolExecutor(6) as ex:
@@ -505,6 +507,9 @@ def build(league):
             skipped += 1
             continue
         line = p["line"]
+        if label in calib.DROP_HALF and line == 0.5:
+            skipped += 1  # 0.5 steals/blocks: almost always an under at a steep price, taken off the board
+            continue
         hits = sum(1 for x in last if x["v"] > line)
         avg = round(sum(x["v"] for x in last) / 5, 1)
         season = [x for x in played if x["cur"]]
@@ -553,14 +558,22 @@ def build(league):
             vv.append(stat_value(vg["stats"], keys, label))
         got = [x for x in vv if x is not None]
         vs_hits = sum(1 for x in got if x > line)
+        # "form" is the last-5 + season blend (with the NFL matchup nudge). "proj" is the calibrated
+        # chance of the over: form and the Vegas price, weighted by how each has done in the tracker.
+        vg = implied(p["over"]["odds"]) if p["over"] else None
+        vgu = implied(p["under"]["odds"]) if p["under"] else None
+        form = proj
+        low = label in calib.LOW_CONF
+        proj = calib.td_chance(vg) if low else calib.chance(coef, vg if vg is not None else (100 - vgu if vgu else 50), form)
+        c = ("out" if (pl["injury"] or {}).get("status") in OUT_STATUSES
+             else calib.call(proj, label, vg, vgu))
         pl["props"].append({
             "stat": label, "line": line, "over": p["over"], "under": p["under"],
             "last5": last, "hits": hits, "pct": l5_pct, "avg": avg,
             "season": {"n": s_n, "hits": s_hits, "pct": s_pct, "avg": s_avg},
-            "vegas": implied(p["over"]["odds"]) if p["over"] else None,
-            "proj": proj, "projBase": proj_base, "matchup": matchup,
-            "call": ("out" if (pl["injury"] or {}).get("status") in OUT_STATUSES
-                     else "hit" if proj >= 55 else "miss"),
+            "vegas": vg, "vegasU": vgu,
+            "proj": proj, "form": form, "projBase": proj_base, "matchup": matchup,
+            "call": c, "strong": calib.strong(proj, c, vg, vgu), "low": low,
             "keys": keys,
             # career vs today's opponent: shown in the player's dropdown, not used in "proj"
             "vs": {"n": len(got), "hits": vs_hits, "avg": round(sum(got) / len(got), 1) if got else None,
@@ -576,7 +589,7 @@ def build(league):
             if pl["vs"]:
                 pl["vs"].pop("_games", None)
         for pl in players:
-            pl["props"].sort(key=lambda x: -x["proj"])
+            pl["props"].sort(key=lambda x: -abs(x["proj"] - 50))
             # the line under the name: the player's main stat for his position, else any prop with a matchup
             main = {"QB": "Pass Yds", "RB": "Rush Yds", "WR": "Rec Yds", "TE": "Rec Yds"}
             ms = [x for x in pl["props"] if x.get("matchup")]
@@ -586,14 +599,14 @@ def build(league):
                 if x.get("matchup"):
                     x["matchup"] = {k: x["matchup"][k] for k in ("rank", "allowed", "avg", "nudge", "tier")}
         players.sort(key=lambda pl: ((pl["injury"] or {}).get("status") in OUT_STATUSES,
-                                     -max(x["proj"] for x in pl["props"]), pl["name"]))
+                                     -max(abs(x["proj"] - 50) for x in pl["props"]), pl["name"]))
         out_games.append({**g, "players": players})
     out_games.sort(key=lambda g: g["start"] or "")
     return {
         "league": league.upper(),
         "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games, season and career stats: ESPN game logs.",
-        "rule": "Projected % = 60% season hit rate + 40% last-5 hit rate against the consensus line (midpoint of best over and best under). Green = 55% or higher.",
+        "rule": "Form % = 60% season hit rate + 40% last-5 hit rate against the consensus line. Projected % = chance of the over from form and the Vegas price, calibrated weekly on graded results. Over at 55%+, Under at 45% or less, only when that beats the book's price; Pass otherwise.",
         "propsSeen": len(props), "propsSkipped": skipped,
         "games": out_games,
     }
@@ -608,9 +621,12 @@ if __name__ == "__main__":
     board = {"run": now.strftime("r%Y%m%dT%H%M%S"), "createdAt": now.isoformat(timespec="seconds"),
              "leagues": {}, "games": []}
     errors = 0
+    import calib
+    import lines
+    coef = calib.load(data_dir, now)
     for lg in ("nfl", "nba"):
         try:
-            data = build(lg)
+            data = build(lg, coef[lg.upper()])
         except Exception as e:  # keep the other league going
             data = {"league": lg.upper(), "error": str(e), "games": []}
         errors += bool(data.get("error"))
@@ -620,6 +636,8 @@ if __name__ == "__main__":
         board["games"] += [{"league": lg.upper(), **g} for g in data["games"]]
         print(f"{lg}: {len(data['games'])} games, {n} props, skipped {data.get('propsSkipped')}",
               data.get("error") or "")
+    board["calibration"] = coef
+    lines.apply(board, data_dir, now)
     import penalty
     board["parlays"] = penalty.build(board["games"])
     os.makedirs(data_dir, exist_ok=True)

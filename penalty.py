@@ -1,8 +1,9 @@
 """Penny Blocks: five parlays per league built from the board's highest projected props.
 
-Each parlay takes one stat, picks the props with the highest Projected % for it (one leg per
-player, green calls only, no injured players, same-game legs allowed), and prices the parlay from
-each leg's best available over odds.
+Each parlay takes one stat and picks the strongest calls for it, overs or unders (one leg per
+player, no injured players, same-game legs allowed), ranked by how far the chance of that side beats the sportsbook's price. It is
+priced from each leg's best available odds for that side. Anytime TD has no "no" side on the board
+and is priced from Vegas alone, so its parlay is the likeliest scorers, marked low confidence.
 """
 
 # (stat label, legs) per league. Same-game legs are allowed.
@@ -46,19 +47,28 @@ def build(games):
                     if pl.get("injury"):  # skip anyone on the injury report, questionable included
                         continue
                     for x in pl.get("props", []):
-                        if x["stat"] != stat or x.get("call") != "hit" or not x.get("over"):
+                        if x["stat"] != stat:
                             continue
-                        dec = decimal_odds(x["over"].get("odds"))
+                        c = x.get("call")
+                        if x.get("low") and x.get("over"):
+                            c = "hit"  # Anytime TD: the likeliest scorers, whatever their call
+                        side = "over" if c == "hit" else "under" if c == "miss" else None
+                        if not side or not x.get(side):
+                            continue
+                        dec = decimal_odds(x[side].get("odds"))
                         if not dec:
                             continue
+                        chance = x["proj"] if side == "over" else 100 - x["proj"]
                         se = x.get("season") or {}
-                        edge = ((se.get("avg") or x["avg"]) - x["line"]) / max(x["line"], 0.5)
                         cands.append({
                             "name": pl["name"], "team": pl.get("team"), "pid": pl.get("pid"),
                             "game": label, "gameId": g["id"], "event": g.get("espnEvent"), "start": g.get("start"),
-                            "line": x["line"], "overLine": x["over"]["line"], "odds": x["over"]["odds"],
-                            "dec": dec, "proj": x["proj"], "vegas": x.get("vegas"),
-                            "season": se, "l5": x["hits"], "_rank": (x["proj"], se.get("n") or 0, edge),
+                            "side": side, "line": x["line"], "sideLine": x[side]["line"], "odds": x[side]["odds"],
+                            "dec": dec, "proj": chance, "vegas": x.get("vegas" if side == "over" else "vegasU"),
+                            "strong": x.get("strong", False), "low": x.get("low", False),
+                            "season": se, "l5": x["hits"],
+                            # best value first: how far the chance beats the book's price, then the chance
+                            "_rank": (chance if x.get("low") else chance - (x.get("vegas" if side == "over" else "vegasU") or 0), chance),
                         })
             cands.sort(key=lambda c: c["_rank"], reverse=True)
             legs, seen = [], set()
@@ -71,7 +81,7 @@ def build(games):
                     break
             if len(legs) < MIN_LEGS:
                 out.append({"id": f"{league}-{stat}", "league": league, "stat": stat, "legs": [],
-                            "note": f"Not enough green {stat} props on the board right now."})
+                            "note": f"Not enough {stat} calls on the board right now."})
                 continue
             dec, chance = 1.0, 1.0
             for l in legs:
@@ -81,5 +91,6 @@ def build(games):
                 "id": f"{league}-{stat}", "league": league, "stat": stat, "legs": legs,
                 "dec": round(dec, 2), "american": american_odds(dec),
                 "proj": round(100 * chance, 1), "implied": round(100 / dec, 1),
+                "low": any(l.get("low") for l in legs),
             })
     return out
