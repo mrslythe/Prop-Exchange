@@ -30,7 +30,8 @@ Five games is a small sample and ignores injuries, matchups and minutes. Treat i
 
 | File | What it does |
 | --- | --- |
-| `index.html` | The board. Loads `data/board.json`. |
+| `index.html` | The board's page and styles. Has a Content Security Policy: only the site's own script (`app.js`), Google Fonts and its own `data/` files may load. |
+| `app.js` | The page's script (kept out of `index.html` so the security policy can block every inline script). Bump `?v=` in `index.html` after changing it. |
 | `build_board.py` | Pulls the lines, game logs and injury report and writes `data/board.json`, then runs the tracker. Python 3 standard library plus `curl`. |
 | `dvp.py` | NFL defense vs. position: box scores, rankings, and the matchup nudge. |
 | `penalty.py` | Builds the Penny Blocks parlays from the board. |
