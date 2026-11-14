@@ -94,7 +94,7 @@ function renderPenalty(){
   const list = parlays.filter(p => league === "ALL" || p.league === league);
   const pr = rec?.parlays;
   $("precord").innerHTML = pr && pr.n
-    ? `<span>Parlay record <b>${pr.won} of ${pr.n} hit</b> (${Math.round(100*pr.won/pr.n)}%)${pr.profit != null ? ` · ${money(pr.profit)} betting $10 on each` : ""}</span>${pr.pending ? `<span>${pr.pending} waiting on games</span>` : ""}<span class="precent">${(pr.recent||[]).slice(0,10).map(p => `<span class="${p.res === "won" ? "w" : p.res === "lost" ? "l" : ""}" title="${esc(p.d)}">${esc(p.lg)} ${esc(p.s)} ${p.res === "won" ? "✓ " + esc(p.american||"") : p.res === "lost" ? "✗" : "void"}</span>`).join("")}</span>`
+    ? `<span>This week <b>${pr.week?.won ?? 0} of ${pr.week?.n ?? 0} hit</b>${pr.week?.n ? ` · ${money(pr.week.profit)}` : ""}</span><span>All-time <b>${pr.won} of ${pr.n}</b> (${Math.round(100*pr.won/pr.n)}%)${pr.profit != null ? ` · ${money(pr.profit)} betting $10 on each` : ""}</span>${pr.pending ? `<span>${pr.pending} waiting on games</span>` : ""}<span class="precent">${(pr.recent||[]).slice(0,10).map(p => `<span class="${p.res === "won" ? "w" : p.res === "lost" ? "l" : ""}" title="${esc(p.d)}">${esc(p.lg)} ${esc(p.s)} ${p.res === "won" ? "✓ " + esc(p.american||"") : p.res === "lost" ? "✗" : "void"}</span>`).join("")}</span>`
     : `<span>No parlays graded yet. ${pr?.pending ? `<b>${pr.pending}</b> saved and waiting on their games.` : "Each parlay is saved before its first leg starts and graded after the games."}</span>`;
   if (!list.length) { $("pgrid").innerHTML = `<div class="empty"><b>No parlays right now</b>The next update builds new ones once Vegas posts props.</div>`; return; }
   $("pgrid").innerHTML = list.map((par, i) => {
@@ -289,12 +289,17 @@ function renderRecord(r){
     return;
   }
   const w = r.week || {}, cls = (h, n) => n && h / n >= .5 ? "u" : "d";
-  const wp = (w.gP || 0) + (w.rP || 0), wb = (w.gB || 0) + (w.rB || 0);
-  sum.innerHTML = `<span>Over calls hit <b class="${cls(t.gHit, t.gN)}">${pctTxt(t.gHit, t.gN)}</b> (${t.gHit}/${t.gN})${pl(t, "g")}</span>
-    ${t.lN ? `<span>Leans went over <b class="${cls(t.lHit, t.lN)}">${pctTxt(t.lHit, t.lN)}</b> (${t.lHit}/${t.lN})${pl(t, "l")}</span>` : ""}
-    <span>Under calls hit <b class="${cls(t.rHit, t.rN)}">${pctTxt(t.rHit, t.rN)}</b> (${t.rHit}/${t.rN})${pl(t, "r")}</span>
-    ${t.sN ? `<span>Strong calls <b class="${cls(t.sHit, t.sN)}">${pctTxt(t.sHit, t.sN)}</b> (${t.sHit}/${t.sN})${pl(t, "s")}</span>` : ""}
-    <span>Last 7 days <b>${pctTxt((w.gHit||0) + (w.rHit||0), (w.gN||0) + (w.rN||0))}</b>${wb ? ` · ${money(wp)}` : ""}</span>`;
+  const wkLabel = d => "Week of " + new Date(d + "T12:00:00").toLocaleDateString([], {month: "short", day: "numeric"});
+  const tot = b => ({n: (b.gN||0) + (b.rN||0), h: (b.gHit||0) + (b.rHit||0), P: (b.gP||0) + (b.rP||0), B: (b.gB||0) + (b.rB||0)});
+  const chip = (label, b, k, N, H) => b[N] ? `<span>${label} <b class="${cls(b[H], b[N])}">${pctTxt(b[H], b[N])}</b> (${b[H]}/${b[N]})${pl(b, k)}</span>` : "";
+  const at = tot(t);
+  sum.innerHTML = `<span class="rtitle" style="font-size:13px">This week</span>
+    ${w.gN || w.rN || w.lN ? `${chip("Over", w, "g", "gN", "gHit")}${chip("Lean", w, "l", "lN", "lHit")}${chip("Under", w, "r", "rN", "rHit")}${chip("Strong", w, "s", "sN", "sHit")}`
+      : `<span>No graded games yet this week (starts Monday).</span>`}
+    <span style="opacity:.8">All-time: ${pctTxt(at.h, at.n)} (${at.h}/${at.n})${at.B ? ` · ${money(at.P)}` : ""}</span>`;
+  const wkRow = b => { const x = tot(b); return `<tr><td>${esc(wkLabel(b.w))}${b.w === r.weekStart ? " <span class=\"rstat\">(now)</span>" : ""}</td><td>${pctTxt(b.gHit,b.gN)}${plT(b, "g")}</td><td>${pctTxt(b.lHit||0,b.lN||0)}${plT(b, "l")}</td><td>${pctTxt(b.rHit,b.rN)}${plT(b, "r")}</td><td>${x.B ? money(x.P) : "—"}</td></tr>`; };
+  const wk = (r.weeks || []).map(wkRow).join("");
+  const allRow = `<tr><td><b>All-time</b></td><td>${pctTxt(t.gHit,t.gN)}${plT(t, "g")}</td><td>${pctTxt(t.lHit||0,t.lN||0)}${plT(t, "l")}</td><td>${pctTxt(t.rHit,t.rN)}${plT(t, "r")}</td><td>${at.B ? money(at.P) : "—"}</td></tr>`;
   const lg = Object.entries(r.byLeague || {}).map(([k,v]) => `<tr><td>${esc(k)}</td><td>${pctTxt(v.gHit,v.gN)} <span class="rstat">(${v.gHit}/${v.gN})</span>${plT(v, "g")}</td><td>${pctTxt(v.rHit,v.rN)} <span class="rstat">(${v.rHit}/${v.rN})</span>${plT(v, "r")}</td></tr>`).join("");
   const bk = Object.entries(r.buckets || {}).filter(([,v]) => v.n).map(([k,v]) => {
     const pc = Math.round(100*v.over/v.n);
@@ -311,13 +316,14 @@ function renderRecord(r){
     return `<tr><td>${esc(p.n)} <span class="rstat">${esc(p.gl)}</span></td><td>${esc(p.s)} ${ov ? "o" : "u"}${p.line}${p.strong ? " ★" : ""}</td><td>${p.proj}%</td><td class="chg ${right ? "u" : "d"}">${p.a} ${right ? "✓" : "✗"}</td></tr>`;
   }).join("") : "";
   body.innerHTML = `<div class="rbody">
-    <div><h5>By league</h5><table><thead><tr><th>League</th><th>Over calls</th><th>Under calls</th></tr></thead><tbody>${lg}</tbody></table></div>
+    <div class="wide"><h5>Week by week (Monday to Sunday)</h5><div class="tbl"><table><thead><tr><th>Week</th><th>Over (green)</th><th>Lean (yellow)</th><th>Under (red)</th><th>Over + Under $</th></tr></thead><tbody>${wk}${allRow}</tbody></table></div></div>
+    <div><h5>By league (all-time)</h5><table><thead><tr><th>League</th><th>Over calls</th><th>Under calls</th></tr></thead><tbody>${lg}</tbody></table></div>
     <div><h5>Does the projection hold up?</h5><table><thead><tr><th>Projected</th><th>Props</th><th>Actually went over</th></tr></thead><tbody>${bk}</tbody></table><p class="rstat" style="margin:6px 0 0">If the projection is honest, each row's real rate lands inside its range.</p></div>
     <div><h5>By day</h5><table><thead><tr><th>Day</th><th>Over calls</th><th>Under calls</th></tr></thead><tbody>${dy}</tbody></table></div>
     ${st ? `<div><h5>Calls by stat (5+ calls)</h5><table><thead><tr><th>Stat</th><th>Calls</th><th>Right</th></tr></thead><tbody>${st}</tbody></table></div>` : ""}
-    ${gl ? `<div><h5>Game lines (totals and spreads)</h5><table><thead><tr><th>Call</th><th>Right</th><th>$10 each</th></tr></thead><tbody>${gl}</tbody></table></div>` : ""}
+    ${gl ? `<div><h5>Game lines (all-time)</h5><table><thead><tr><th>Call</th><th>Right</th><th>$10 each</th></tr></thead><tbody>${gl}</tbody></table></div>` : ""}
     ${lt ? `<div class="wide"><h5>Latest results: calls from ${esc(fmtD(r.latest.d))}</h5><div class="tbl"><table><thead><tr><th>Player</th><th>Call</th><th>Projected</th><th>Final</th></tr></thead><tbody>${lt}</tbody></table></div></div>` : ""}
-  </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Pushes and players who did not play are not counted. Over and Under counts are green and red calls; yellow leans are counted separately. <b>Dollar amounts</b> are the profit or loss from betting $10 on every call at the best price when it was saved (a win pays the odds, a loss costs $10). At standard −110 odds you need to win 52.4% just to break even. Red anytime-TD calls are left out: there is no "no TD" bet on the board. ★ = strong call. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>${old}`;
+  </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Each week runs Monday to Sunday by the game's Eastern date and starts fresh; past weeks stay in the table and in the all-time totals. Pushes and players who did not play are not counted. Over and Under counts are green and red calls; yellow leans are counted separately. <b>Dollar amounts</b> are the profit or loss from betting $10 on every call at the best price when it was saved (a win pays the odds, a loss costs $10). At standard −110 odds you need to win 52.4% just to break even. Red anytime-TD calls are left out: there is no "no TD" bet on the board. ★ = strong call. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>${old}`;
 }
 fetch("data/record.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(r => {
   if (r) { rec = r; renderRecord(r); renderPenalty(); } else document.querySelector("#record .rstat").textContent = "Results will appear after the first games are graded.";

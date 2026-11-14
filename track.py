@@ -287,8 +287,10 @@ def summarize(data_dir, now):
 
     total, by_league, by_stat, days = blank(), {}, {}, []
     buckets = {k: {"n": 0, "over": 0} for k in ("0-29", "30-45", "46-57", "58-69", "70-100")}
-    week = blank()
-    week_start = (now.astimezone(ET).date() - dt.timedelta(days=6)).isoformat()
+    # calendar weeks, Monday to Sunday (by the game's Eastern date); "week" is the current one
+    week_of = lambda day: (dt.date.fromisoformat(day) - dt.timedelta(days=dt.date.fromisoformat(day).weekday())).isoformat()
+    this_week = week_of(now.astimezone(ET).date().isoformat())
+    weeks = {}
     latest = None
     pending = 0
     for path in sorted(glob.glob(f"{data_dir}/picks/*.json")):
@@ -306,8 +308,7 @@ def summarize(data_dir, now):
                 continue
             for b in (total, dayb, by_league.setdefault(p["lg"], blank()), by_stat.setdefault(f"{p['lg']} {p['s']}", blank())):
                 add(b, p)
-            if day >= week_start:
-                add(week, p)
+            add(weeks.setdefault(week_of(day), blank()), p)
             pr = p["proj"]
             bk = "0-29" if pr < 30 else "30-45" if pr < 46 else "46-57" if pr < 58 else "58-69" if pr < 70 else "70-100"
             buckets[bk]["n"] += 1
@@ -318,7 +319,8 @@ def summarize(data_dir, now):
             latest = (day, graded_today)
     rec = {
         "updatedAt": now.isoformat(timespec="seconds"),
-        "total": total, "week": week, "pending": pending,
+        "total": total, "week": weeks.get(this_week, blank()), "weekStart": this_week, "pending": pending,
+        "weeks": [{"w": w, **weeks[w]} for w in sorted(weeks, reverse=True)][:26],
         "byLeague": by_league,
         "byStat": dict(sorted(by_stat.items(), key=lambda kv: -kv[1]["gN"])),
         "buckets": buckets,
@@ -343,7 +345,15 @@ def summarize(data_dir, now):
         "profit": round(sum(STAKE * ((_dec(p.get("american")) or 1) - 1) if p["res"] == "won" else -STAKE
                             for p in done), 2),
     }
-    rec["games"] = summarize_games(data_dir)
+    pw = {}
+    for p in done:
+        b = pw.setdefault(week_of(p["d"]), {"n": 0, "won": 0, "profit": 0.0})
+        b["n"] += 1
+        b["won"] += p["res"] == "won"
+        b["profit"] = round(b["profit"] + (STAKE * ((_dec(p.get("american")) or 1) - 1) if p["res"] == "won" else -STAKE), 2)
+    rec["parlays"]["week"] = pw.get(this_week, {"n": 0, "won": 0, "profit": 0.0})
+    rec["parlays"]["weeks"] = {w: pw[w] for w in sorted(pw, reverse=True)[:26]}
+    rec["games"] = summarize_games(data_dir, this_week)
     with open(f"{data_dir}/record.json", "w") as f:
         json.dump(rec, f, separators=(",", ":"))
     return rec
@@ -415,9 +425,9 @@ def grade_games(data_dir, now):
     return graded
 
 
-def summarize_games(data_dir):
-    """Record for game-line calls: per market and color, hits and $10 profit."""
-    out = {}
+def summarize_games(data_dir, this_week=None):
+    """Record for game-line calls: per market and color, hits and $10 profit (all time and this week)."""
+    out, wk = {}, {}
     recent = []
     for path in sorted(glob.glob(f"{data_dir}/gamepicks/*.json")):
         day = os.path.basename(path)[:-5]
@@ -425,14 +435,17 @@ def summarize_games(data_dir):
             if p.get("r") in (None, "push", "void"):
                 continue
             won = p["r"] == p["side"]
-            b = out.setdefault(p["s"], {}).setdefault(p["call"], {"n": 0, "hit": 0, "P": 0.0, "B": 0})
-            b["n"] += 1
-            b["hit"] += won
+            d0 = dt.date.fromisoformat(day)
+            in_week = this_week and (d0 - dt.timedelta(days=d0.weekday())).isoformat() == this_week
             dec = _dec(p.get("odds"), p.get("vg"))
-            if dec:
-                b["P"] = round(b["P"] + (STAKE * (dec - 1) if won else -STAKE), 2)
-                b["B"] += 1
+            for tgt in ((out, wk) if in_week else (out,)):
+                b = tgt.setdefault(p["s"], {}).setdefault(p["call"], {"n": 0, "hit": 0, "P": 0.0, "B": 0})
+                b["n"] += 1
+                b["hit"] += won
+                if dec:
+                    b["P"] = round(b["P"] + (STAKE * (dec - 1) if won else -STAKE), 2)
+                    b["B"] += 1
             recent.append({"d": day, "lg": p["lg"], "gl": p["gl"], "s": p["s"], "call": p["call"],
                            "pick": p.get("pick") or f"{p['side'].title()} {p['line']:g}", "proj": p["proj"],
                            "a": p["a"], "won": won})
-    return {"by": out, "recent": recent[-20:][::-1]}
+    return {"by": out, "week": wk, "recent": recent[-20:][::-1]}
