@@ -6,8 +6,16 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <style id="antiClickjack">body{display:none!important}</style>
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="description" content="Daily NFL and NBA player props: each player&#39;s last 5 games against the Vegas line, marked green to hit or red to miss.">
+<meta name="description" content="Daily NFL and NBA player props called Over, Lean or Under against the Vegas line, with last 5 + season form, matchups and injuries. Updated hourly.">
 <title>Prop Exchange Board</title>
+<meta property="og:title" content="Prop Exchange: today's NFL &amp; NBA props">
+<meta property="og:description" content="Every player prop called Over, Lean or Under against the Vegas line. Last 5 + season form, matchups and injuries, updated hourly.">
+<meta property="og:image" content="https://mrslythe.github.io/Prop-Exchange/og.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:url" content="https://mrslythe.github.io/Prop-Exchange/">
+<meta property="og:type" content="website">
+<meta name="twitter:card" content="summary_large_image">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow+Condensed:wght@500;600;700;800&family=IBM+Plex+Mono:wght@400;500;600;700&display=swap">
 <style>
@@ -228,7 +236,66 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 .foot[open] summary::before{transform:rotate(90deg)}
 .foot ul{margin:8px 0 0;padding-left:18px;display:grid;gap:4px}
 .foot b{color:var(--fg);font-weight:600}
-@media (max-width:640px){.brand small{display:none} input{width:120px} .gname{font-size:18px}}
+.ic{flex:none;vertical-align:-2px}
+.badge .ic,.flag .ic,.inj .ic{margin-right:4px}
+.flag{display:inline-flex;align-items:center}
+.hot{color:#ff9f43;display:inline-flex}
+.badge.homestate{border-color:#5aa9e6;color:#bfe0fb}
+.filtbtn{display:none;align-items:center;justify-content:center;width:44px;height:36px;background:transparent;color:var(--fg);border:1px solid var(--rule);border-radius:3px;cursor:pointer}
+.filt{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.intro{display:grid;gap:6px;padding:10px 0 2px;color:var(--muted);font-size:12px}
+.intro p{margin:0;color:var(--fg);font-size:13px}
+.intro .key{display:flex;flex-wrap:wrap;gap:4px 16px}
+.intro .key .u{color:var(--up)} .intro .key .d{color:var(--down)} .intro .key b{color:var(--fg)} .intro .key .y{color:var(--amber)}
+.intro .wk b{color:var(--fg)}
+.intro .legend .badge{margin-left:0}
+.intro .legend{gap:5px 6px}
+.intro .legend .badge,.intro .legend .flag{font-size:10.5px}
+#record summary .rstat{display:inline-flex;flex-wrap:wrap;gap:2px 14px;align-items:baseline}
+/* tidy-up: one rhythm for rows and secondary text */
+td{padding:7px 10px}
+td small.sub{margin-top:2px}
+@media (max-width:640px){
+  .brand small{display:none} .gname{font-size:18px}
+  .bar{flex-wrap:nowrap;padding-block:8px;gap:8px}
+  .brand h1{font-size:21px;letter-spacing:.04em}
+  .ctrls{flex-wrap:nowrap;gap:6px}
+  .seg button{padding:8px 10px;font-size:14px}
+  .filt{display:none}
+  .filtbtn{display:inline-flex}
+  .top.showfilt .bar{flex-wrap:wrap}
+  .top.showfilt .ctrls{flex-wrap:wrap;width:100%;justify-content:flex-end}
+  .top.showfilt .filt{display:flex;width:100%}
+  .filt select,.filt input{flex:1 1 140px;min-height:40px;width:auto}
+  .tape-inner{padding:4px 0}
+  .tabs a{font-size:15px;padding:8px 10px}
+  /* each prop becomes a card: stat + call on top, last 5 across, then averages */
+  .game .tbl{overflow:visible}
+  .game table{min-width:0;display:block}
+  .game thead{display:none}
+  .game tbody,.game tr{display:block}
+  .game tr[hidden]{display:none}
+  .game td{display:block;white-space:normal;border:0;padding:0;text-align:left}
+  .game tr.player td{padding:12px 12px 8px;border-bottom:1px solid var(--rule)}
+  .game tr.q{display:grid;grid-template-columns:repeat(3,minmax(0,1fr)) auto;grid-template-areas:"stat stat stat call" "line line line call" "l5 l5 l5 l5" "a s v v";gap:6px 10px;padding:10px 12px;border-bottom:1px solid var(--grid)}
+  .game tr.q td:nth-child(1){grid-area:stat;font-size:14px}
+  .game tr.q td:nth-child(2){grid-area:line}
+  .game tr.q td:nth-child(3){grid-area:l5}
+  .game tr.q td:nth-child(4){grid-area:a}
+  .game tr.q td:nth-child(5){grid-area:s}
+  .game tr.q td:nth-child(6){grid-area:v}
+  .game tr.q td:nth-child(7){grid-area:call;text-align:right;align-self:start}
+  .game tr.q.isout td:nth-child(5){grid-area:call}
+  .game tr.q td[data-label]::before{content:attr(data-label);display:block;font-size:10px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase;margin-bottom:1px}
+  .game tr.q td[data-label="Line"]{display:flex;gap:8px;align-items:baseline;flex-wrap:wrap}
+  .game tr.q td[data-label="Line"]::before{display:inline;margin:0}
+  .game tr.q td[data-label="Line"] small.sub{display:inline}
+  .game td.stat{padding-left:0}
+  .game .l5{display:flex} .game .l5 i{flex:1;min-width:0}
+  .game tr.q:hover td{background:none}
+  .game tr.prow td,.game tr.vsrow td{padding:10px 12px}
+  .pdet{position:static;width:auto}
+}
 </style>
 </head>
 <body>
@@ -242,6 +309,8 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
         <button type="button" id="lgNFL" data-lg="NFL" aria-pressed="false">NFL</button>
         <button type="button" id="lgNBA" data-lg="NBA" aria-pressed="false">NBA</button>
       </div>
+      <button type="button" id="filtBtn" class="filtbtn" aria-label="Filters" aria-expanded="false" aria-controls="filt"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" aria-hidden="true"><path d="M4 6h16M7 12h10M10 18h4"/></svg></button>
+      <div class="filt" id="filt">
       <select id="show" aria-label="Show">
         <option value="all">All props</option>
         <option value="hit">Over calls (green)</option>
@@ -250,10 +319,11 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
         <option value="strong">Strong calls only</option>
         <option value="moved">Lines that moved</option>
         <option value="5">5 of 5 last games only</option>
-        <option value="special">Special games (🎂 😤 🏠 📍)</option>
+        <option value="special">Special games (birthday, revenge, hometown)</option>
       </select>
       <select id="stat" aria-label="Stat"><option value="">Every stat</option></select>
       <input id="q" type="search" placeholder="Find player" aria-label="Find player">
+      </div>
     </div>
   </div></div>
   <div class="tape" aria-label="Strongest plays"><div class="tape-inner" id="tape"><span>Loading lines…</span></div></div>
@@ -262,7 +332,12 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
 <main class="gut">
   <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penny-blocks" id="tabPenalty">Penny Blocks</a><a href="#daily-sheet" id="tabSheet">Daily Sheet</a></nav>
   <div id="viewBoard" style="display:grid;gap:12px">
-  <div class="legend" aria-label="Icon key"><span>🎂 Birthday today</span><span>😤 Revenge game: faces last season's team</span><span>🏠 Hometown: born within 35 miles of the arena</span><span>📍 Home state</span></div>
+  <section class="intro" aria-label="About this board">
+    <p>Daily NFL &amp; NBA player props vs the Vegas line. Updated hourly.</p>
+    <div class="key"><span><b class="u">▲ OVER</b> 58%+</span><span><b class="y">◆ LEAN</b> 46–57%</span><span><b class="d">▼ UNDER</b> 45% or less</span><span><b>STRONG</b> 70%+ or 30% or less</span></div>
+    <div class="wk" id="introWeek">Loading this week's record…</div>
+    <div class="legend" id="legend" aria-label="Icon key"></div>
+  </section>
   <details class="record" id="record"><summary><span class="rtitle">Track record</span><span class="rstat">Loading results…</span></summary><div id="recordBody"></div></details>
   <div class="status" id="status"><span>Connecting to the board…</span></div>
   <div id="board" style="display:grid;gap:12px">
@@ -282,11 +357,11 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Anytime TD:</b> priced from Vegas alone and marked low confidence. 0.5 steals and blocks lines are left off.</li>
       <li><b>NFL matchup:</b> what today's defense allows this season to the player's position for that stat, ranked 1 (toughest) to 32. It nudges Form % up to 8 points either way.</li>
       <li><b>Vegas %:</b> the chance the over price implies. It makes up a quarter of Projected %.</li>
-      <li><b>Tap a name:</b> career games vs today's opponent. 🔥 = over in 60%+ of 3+ games. Reference only.</li>
-      <li><b>Injuries:</b> ⚠️ questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
+      <li><b>Tap a name:</b> career games vs today's opponent. The flame marks a prop he cleared in 60%+ of 3+ games vs this team. Reference only.</li>
+      <li><b>Injuries:</b> yellow tag = questionable or day-to-day. OUT, doubtful or injured reserve players are greyed out with no call.</li>
       <li><b>Penny Blocks tab:</b> five parlays per sport from the highest projected overs, with links to build them on Hard Rock or PrizePicks.</li>
       <li><b>Track record:</b> every call is graded after the game, so you can see how often Over and Under calls are right.</li>
-      <li><b>Badges:</b> 🎂 birthday · 😤 faces last season's team · 🏠 born within 35 miles · 📍 home state.</li>
+      <li><b>Badges:</b> Birthday · Revenge (faces last season's team) · Hometown (born within 35 miles) · Home state.</li>
       <li>Stats from ESPN. Treat it as one input, not a sure thing.</li>
     </ul>
   </details>
@@ -302,6 +377,6 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
   </section>
 </main>
 
-<script src="app.js?v=4"></script>
+<script src="app.js?v=5"></script>
 </body>
 </html>

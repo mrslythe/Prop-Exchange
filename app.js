@@ -26,6 +26,21 @@ function when(iso){
   return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
 let special = false;
+// small line icons (replace emoji badges and flags)
+const ICONS = {
+  cake: '<path d="M4 20h16M6 20v-6h12v6M12 14v-4M12 6.5v.5"/>',
+  target: '<circle cx="12" cy="12" r="7"/><path d="M12 2v5M12 17v5M2 12h5M17 12h5"/>',
+  home: '<path d="M3 11l9-8 9 8M5 10v10h14V10"/>',
+  pin: '<path d="M12 21s-7-6.5-7-12a7 7 0 0 1 14 0c0 5.5-7 12-7 12z"/><circle cx="12" cy="9" r="2.5"/>',
+  moon: '<path d="M20 13.5A8 8 0 1 1 10.5 4a6.5 6.5 0 0 0 9.5 9.5z"/>',
+  clock: '<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+  cross: '<path d="M9 3h6v6h6v6h-6v6H9v-6H3V9h6z"/>',
+  flame: '<path d="M12 3c1 3.5 5 5.5 5 10a5 5 0 0 1-10 0c0-2.5 1.5-4 2-6.5 1 1 2 2.2 2.5 3.8.5-2.5 0-5-.5-7.3z"/>',
+  alert: '<path d="M12 4l9 16H3zM12 10v4M12 17v.5"/>'
+};
+const ic = n => `<svg class="ic" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${ICONS[n] || ""}</svg>`;
+const KIND_ICON = {birthday: "cake", revenge: "target", hometown: "home", homestate: "pin"};
+const KIND_LABEL = {birthday: "Birthday", revenge: "Revenge", hometown: "Hometown", homestate: "Home state"};
 const POSN = {QB: "QBs", RB: "RBs", WR: "WRs", TE: "TEs", G: "guards", F: "forwards", C: "centers"};
 // ---- new signals: what nudged each projection, player flags, and the per-prop chart
 const NUDGE_LABEL = {matchup: "matchup", venue: "home/away", minutes: "minutes", b2b: "back-to-back", teammate: "teammate out"};
@@ -38,14 +53,14 @@ function gameRows(p, x){
 function playerFlags(p){
   const out = [];
   const n = (p.props[0] || {}).nudges || {};
-  if (n.b2b) out.push(`<span class="flag" title="Played yesterday: tired legs; projections lowered 2 points">😴 Back-to-back</span>`);
+  if (n.b2b) out.push(`<span class="flag" title="Played yesterday: tired legs; projections lowered 2 points">${ic("moon")}Back-to-back</span>`);
   const mins = (p.gl || []).filter(g => g[4] && g[3]).map(g => g[3]);
   if (mins.length >= 5) {
     const l5 = mins.slice(0, 5).reduce((a, b) => a + b, 0) / 5, se = mins.reduce((a, b) => a + b, 0) / mins.length;
-    if (Math.abs(l5 - se) >= 3) out.push(`<span class="flag ${l5 > se ? "u" : "d"}" title="Minutes per game, last 5 vs this season: a role change shows up here first">⏱ Minutes ${l5 > se ? "▲" : "▼"} ${l5.toFixed(0)} (season ${se.toFixed(0)})</span>`);
+    if (Math.abs(l5 - se) >= 3) out.push(`<span class="flag ${l5 > se ? "u" : "d"}" title="Minutes per game, last 5 vs this season: a role change shows up here first">${ic("clock")}Minutes ${l5 > se ? "▲" : "▼"} ${l5.toFixed(0)} (season ${se.toFixed(0)})</span>`);
   }
   const t = p.props.find(x => x.tm)?.tm;
-  if (t) out.push(`<span class="flag" title="${esc(t.name)} (${t.min} min/game) is out today. Tap a prop to see how this player did without him.">🚑 ${esc(t.name)} out</span>`);
+  if (t) out.push(`<span class="flag" title="${esc(t.name)} (${t.min} min/game) is out today. Tap a prop to see how this player did without him.">${ic("cross")}${esc(t.name)} out</span>`);
   return out.length ? `<span class="flags">${out.join("")}</span>` : "";
 }
 function altLines(line){
@@ -76,7 +91,7 @@ function chartPanel(p, x, key){
   const se = rows.filter(r => r.cur), hm = se.filter(r => r.h), aw = se.filter(r => !r.h);
   const split = (list, t) => list.length ? `${t} <b>${list.filter(r => r.v > x.line).length}/${list.length}</b> (avg ${f1(list.reduce((a, r) => a + r.v, 0) / list.length)})` : "";
   const t = x.tm;
-  const tmTxt = t ? `<p class="note">🚑 <b>Without ${esc(t.name)}</b> (out today, ${t.min} min/game): over in <b>${t.hits}/${t.n}</b> games, avg ${t.avg}${t.nW ? ` · with him: ${t.hitsW}/${t.nW}, avg ${t.avgW}` : ""}.${t.n < 3 ? " Small sample: not used in the projection." : ""}</p>` : "";
+  const tmTxt = t ? `<p class="note">${ic("cross")} <b>Without ${esc(t.name)}</b> (out today, ${t.min} min/game): over in <b>${t.hits}/${t.n}</b> games, avg ${t.avg}${t.nW ? ` · with him: ${t.hitsW}/${t.nW}, avg ${t.avgW}` : ""}.${t.n < 3 ? " Small sample: not used in the projection." : ""}</p>` : "";
   const nt = nudgeTxt(x);
   return `<div class="pdet">
     <div class="pseg" role="group" aria-label="Sample">${btn("5", "L5")}${btn("10", "L10")}${btn("20", "L20")}${btn("season", "Season")}</div>
@@ -181,7 +196,7 @@ function injTag(p){
   const j = p.injury; if (!j) return "";
   const out = OUT.has(j.status);
   const tip = [j.status, j.type, j.note, j.returns ? "Expected back " + fmtD(j.returns.slice(0,10)) : ""].filter(Boolean).join(" · ");
-  return `<span class="inj ${out ? "o" : "q"}" title="${esc(tip)}">${out ? "" : "⚠️ "}${esc(j.status.toUpperCase())}${j.type ? " · " + esc(j.type) : ""}</span>`;
+  return `<span class="inj ${out ? "o" : "q"}" title="${esc(tip)}">${out ? "" : ic("alert")}${esc(j.status.toUpperCase())}${j.type ? " · " + esc(j.type) : ""}</span>`;
 }
 const vsOpen = new Set();
 const fmtD = d => new Date(d + "T12:00:00").toLocaleDateString([], {month:"short", day:"numeric", year:"numeric"});
@@ -194,7 +209,7 @@ function vsPanel(p){
     const s = x.vs || {};
     if (!s.n) return `<tr><td>${esc(x.stat)}</td><td>${x.line}</td><td colspan="4" style="text-align:left;color:var(--muted)">No ${esc(x.stat)} recorded in past games vs this team</td></tr>`;
     const chips = (s.v||[]).map((val,i) => val == null ? "" : `<i class="${val > x.line ? "h" : "m"}" title="${esc(fmtD(v.games[i].d))}">${f1(val)}</i>`).join("");
-    return `<tr><td>${esc(x.stat)}${s.hot ? " 🔥" : ""}</td><td>${x.line}</td><td>${s.n}</td><td class="chg ${s.hits/s.n >= .5 ? "u" : "d"}">${s.hits}/${s.n} · ${Math.round(100*s.hits/s.n)}%</td><td>${s.avg}</td><td><span class="vals">${chips}</span></td></tr>`;
+    return `<tr><td>${esc(x.stat)}${s.hot ? ` <span class="hot" title="Over in 60%+ of 3+ games vs this team">${ic("flame")}</span>` : ""}</td><td>${x.line}</td><td>${s.n}</td><td class="chg ${s.hits/s.n >= .5 ? "u" : "d"}">${s.hits}/${s.n} · ${Math.round(100*s.hits/s.n)}%</td><td>${s.avg}</td><td><span class="vals">${chips}</span></td></tr>`;
   }).join("");
   const glist = v.games.slice(0, 12).map(g => `<span><b>${esc(fmtD(g.d))}</b> ${esc(g.a)} ${esc(g.o)} ${esc(g.r)}${g.p ? " (playoffs)" : ""}</span>`).join("");
   return `<div class="vs"><h4>Career vs ${esc(v.opp)}<small>${v.n} game${v.n>1?"s":""} since ${first}</small></h4>
@@ -273,9 +288,9 @@ function render(){
     const a = g.teams?.away || {}, h = g.teams?.home || {};
     const players = g.players.map(p => ({...p, props: p.props.filter(keep)}))
       .filter(p => p.props.length && (!q || p.name.toLowerCase().includes(q)) && (!special || (p.badges||[]).length));
-    const icons = g.players.flatMap(p => (p.badges||[]).map(bd => bd.icon));
-    const iconTxt = ["🎂","😤","🏠","📍"].map(i => [i, icons.filter(x => x === i).length]).filter(([,n]) => n)
-      .map(([i,n]) => `<span class="pill s" title="${n} player${n>1?"s":""}">${i} ${n}</span>`).join("");
+    const kinds = g.players.flatMap(p => (p.badges||[]).map(bd => bd.kind));
+    const iconTxt = Object.keys(KIND_ICON).map(k => [k, kinds.filter(x => x === k).length]).filter(([,n]) => n)
+      .map(([k,n]) => `<span class="pill s" title="${n} player${n>1?"s":""}: ${KIND_LABEL[k]}">${ic(KIND_ICON[k])} ${n}</span>`).join("");
     const props = g.players.flatMap(p => p.props);
     const gu = props.filter(x => x.call === "hit").length;
     if (special && !players.length) return "";
@@ -288,7 +303,7 @@ function render(){
       const vkey = g.league + g.id + "|" + p.name, vopen = vsOpen.has(vkey);
       const hot = p.props.some(x => x.vs?.hot);
       const out = isOut(p);
-      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} over · ${p.props.filter(x => x.call === "lean").length} lean · ${p.props.filter(x => x.call === "miss").length} under`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}${playerFlags(p)}${dvpLine(p)}</td></tr>
+      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span class="hot" title="Usually goes over vs this team">${ic("flame")}</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} over · ${p.props.filter(x => x.call === "lean").length} lean · ${p.props.filter(x => x.call === "miss").length} under`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}">${ic(KIND_ICON[bd.kind])} ${esc(bd.text)}</span>`).join("")}${playerFlags(p)}${dvpLine(p)}</td></tr>
       <tr class="vsrow"${vopen ? "" : " hidden"}><td colspan="8">${vopen ? vsPanel(p) : ""}</td></tr>` +
       p.props.map(x => {
         const se = x.season || {};
@@ -296,10 +311,10 @@ function render(){
           `<i class="${v.v > x.line ? "h" : "m"}${i===arr.length-1 ? " new" : ""}" title="${esc(v.date)} ${esc(v.atVs)} ${esc(v.opp)}">${f1(v.v)}</i>`).join("");
         if (x.call === "out") return `<tr class="q isout"><td class="stat">${esc(x.stat)}</td><td>${x.line}</td><td colspan="4" style="text-align:left;color:var(--muted)">No call while ${esc(p.injury?.status || "out")}</td><td></td><td class="hit o"><span>OUT</span></td></tr>`;
         const pk = g.league + g.id + "|" + p.name + "|" + x.stat, popen = propOpen.has(pk);
-        return `<tr class="q"><td class="stat"><button type="button" class="sbtn" data-prop="${esc(pk)}" aria-expanded="${popen}" title="Chart, alt lines and splits"><span class="car">▸</span>${esc(x.stat)}</button></td><td>${x.line}${moveTxt(x)}</td><td><span class="l5">${cells}</span></td>
-          <td>${f1(x.avg)}<small class="sub">${x.hits}/5 · ${x.pct}%</small></td>
-          <td class="chg ${se.avg > x.line ? "u" : "d"}">${se.avg ?? "—"}<small class="sub">${se.n ? `${se.hits}/${se.n} · ${se.pct}%` : "no games yet"}</small></td>
-          <td class="odds">${x.vegas != null ? x.vegas + "%" : "—"}<small class="sub">o ${esc(oddsTxt(x.over))}</small></td>
+        return `<tr class="q"><td class="stat"><button type="button" class="sbtn" data-prop="${esc(pk)}" aria-expanded="${popen}" title="Chart, alt lines and splits"><span class="car">▸</span>${esc(x.stat)}</button></td><td data-label="Line">${x.line}${moveTxt(x)}</td><td><span class="l5">${cells}</span></td>
+          <td data-label="Last 5 avg">${f1(x.avg)}<small class="sub">${x.hits}/5 · ${x.pct}%</small></td>
+          <td data-label="Season avg" class="chg ${se.avg > x.line ? "u" : "d"}">${se.avg ?? "—"}<small class="sub">${se.n ? `${se.hits}/${se.n} · ${se.pct}%` : "no games yet"}</small></td>
+          <td data-label="Vegas" class="odds">${x.vegas != null ? x.vegas + "%" : "—"}<small class="sub">o ${esc(oddsTxt(x.over))}</small></td>
           ${callBox(x)}${x.low ? `<small class="sub" title="Anytime TD is priced from Vegas alone: the board's form numbers ran far too high on touchdowns.">Low confidence</small>`
             : x.form != null ? `<small class="sub" title="Base ${x.projBase}% (60% season + 40% last 5)${nudgeTxt(x) ? ", nudged by: " + nudgeTxt(x) : ""}. Tap the stat for details.">Form ${x.form}%${x.form !== x.projBase ? ` (${sgn(x.form - x.projBase)})` : ""}</small>` : ""}</td></tr>
           <tr class="prow"${popen ? "" : " hidden"}><td colspan="8">${popen ? chartPanel(p, x, pk) : ""}</td></tr>`;
@@ -360,7 +375,21 @@ const pctTxt = (h, n) => n ? Math.round(100 * h / n) + "%" : "—";
 const money = v => v == null ? "" : `<b class="${v >= 0 ? "u" : "d"}">${v >= 0 ? "+" : "−"}$${Math.abs(v).toFixed(2)}</b>`;
 const pl = (b, k) => b && b[k + "B"] ? ` · ${money(b[k + "P"])}` : "";
 const plT = (b, k) => b && b[k + "B"] ? `<div class="rstat">${money(b[k + "P"])}</div>` : "";  // in tables: own line
+function introWeek(r){
+  const el = $("introWeek"); if (!el || !r) return;
+  const w = r.week || {}, pc = (h, n) => n ? Math.round(100 * h / n) + "%" : "—";
+  el.innerHTML = (w.gN || w.rN) ? `This week: overs <b>${pc(w.gHit, w.gN)}</b> · unders <b>${pc(w.rHit, w.rN)}</b>${w.sN ? ` · strong <b>${pc(w.sHit, w.sN)}</b>` : ""}`
+    : "This week's results show up after the first games are graded.";
+}
+{
+  const lg = $("legend");
+  if (lg) lg.innerHTML = Object.keys(KIND_ICON).map(k => `<span class="badge ${k}">${ic(KIND_ICON[k])} ${KIND_LABEL[k]}</span>`).join("") +
+    `<span class="flag">${ic("moon")}Back-to-back</span><span class="flag">${ic("clock")}Minutes trend</span><span class="flag">${ic("cross")}Teammate out</span><span class="flag"><span class="hot">${ic("flame")}</span>Hot vs this team</span>`;
+  const fb = $("filtBtn");
+  if (fb) fb.addEventListener("click", () => { const t = document.querySelector("header.top"); const on = t.classList.toggle("showfilt"); fb.setAttribute("aria-expanded", String(on)); });
+}
 function renderRecord(r){
+  introWeek(r);
   const sum = document.querySelector("#record .rstat"), body = $("recordBody");
   const t = r.total || {}, v1 = r.v1 || {};
   const old = v1.gN || v1.rN ? `<p class="rnote"><b>Earlier versions (Nov 6–12):</b> green calls hit ${pctTxt(v1.gHit, v1.gN)} (${v1.gHit}/${v1.gN}), red calls went under ${pctTxt(v1.rHit, v1.rN)} (${v1.rHit}/${v1.rN}). The track record above counts the current version (green 58%+, yellow 46–57%, red 45% or less) from Nov 12 on.</p>` : "";
