@@ -174,6 +174,14 @@ def espn_find(league, name):
     return None
 
 
+def _et_date(iso):
+    """ESPN game times are UTC: a 7:30 PM Eastern tip-off is the next day in UTC. Use the Eastern date."""
+    try:
+        return dt.datetime.fromisoformat(iso.replace("Z", "+00:00")).astimezone(ET).date().isoformat()
+    except (ValueError, TypeError):
+        return (iso or "")[:10]
+
+
 def espn_games(league, pid):
     """Every regular-season and playoff game of a player's career, newest first.
 
@@ -210,7 +218,8 @@ def espn_games(league, pid):
                     m = evmeta[eid]
                     opp = m.get("opponent") or {}
                     games.append({
-                        "date": m.get("gameDate", "")[:10],
+                        "event": str(eid),
+                        "date": _et_date(m.get("gameDate", "")),
                         "season": season, "cur": cur, "post": "Postseason" in label,
                         "opp": opp.get("abbreviation", ""), "oppId": str(opp.get("id", "")),
                         "oppName": opp.get("displayName", ""),
@@ -434,6 +443,7 @@ def espn_injuries(league):
                 continue
             det = i.get("details") or {}
             out[m.group(1)] = {"status": status, "type": det.get("type") or "",
+                               "team": str(t.get("id") or ""), "name": a.get("displayName") or "",
                                "note": i.get("shortComment") or "", "returns": det.get("returnDate") or ""}
     return out
 
@@ -489,6 +499,15 @@ def build(league):
                                current_season("nfl"))
         except Exception as e:
             print("defense vs position unavailable:", e, file=sys.stderr)
+    nbx = None
+    if league == "nba":
+        try:
+            import nba as nba_mod
+            nbx = defense = nba_mod.load(os.path.join(os.path.dirname(os.path.abspath(__file__)), "data"),
+                                         dt.datetime.now(dt.timezone.utc))
+        except Exception as e:
+            print("NBA box scores unavailable:", e, file=sys.stderr)
+    role_cache, split_cache = {}, {}
 
     board = {}
     skipped = 0
@@ -500,7 +519,7 @@ def build(league):
             if v is None:
                 continue
             played.append({"v": v, "date": g["date"], "opp": g["opp"],
-                           "atVs": g["atVs"], "cur": g.get("cur", True)})
+                           "atVs": g["atVs"], "cur": g.get("cur", True), "home": g["atVs"] != "@"})
         last = [{k: x[k] for k in ("v", "date", "opp", "atVs")} for x in played[:5]]
         if len(last) < 5:
             skipped += 1
@@ -527,17 +546,77 @@ def build(league):
         else:
             proj = l5_pct
         gid = p["event"]
-        # NFL matchup: nudge the projection by how much the opponent allows this stat to this position
-        matchup, proj_base = None, proj
+        g0 = games[gid]
+        proj_base = proj
         person = people.get(p["player"])
-        if defense and person and person.get("team"):
-            g0 = games[gid]
-            if person["team"] in (g0.get("espnAway"), g0.get("espnHome")):
-                opp = g0["espnHome"] if person["team"] == g0["espnAway"] else g0["espnAway"]
-                matchup = defense.matchup(opp, defense.position(ids.get(p["player"])), keys)
-                if matchup:
-                    matchup["opp"] = (teams.get(opp) or {}).get("displayName", "")
-                    proj = max(1, min(99, proj + matchup["nudge"]))
+        my_team = (person or {}).get("team")
+        in_game = bool(my_team) and my_team in (g0.get("espnAway"), g0.get("espnHome"))
+        nudges = {}  # each signal's push on the projection, in points of %
+        # matchup: how much today's defense allows this stat to the player's position (NFL and NBA)
+        matchup = None
+        if defense and in_game:
+            opp = g0["espnHome"] if my_team == g0["espnAway"] else g0["espnAway"]
+            matchup = defense.matchup(opp, defense.position(ids.get(p["player"])), keys)
+            if matchup:
+                matchup["opp"] = (teams.get(opp) or {}).get("displayName", "")
+                if matchup["nudge"]:
+                    nudges["matchup"] = matchup["nudge"]
+        # home/away: this season's hit rate at today's venue vs his overall season rate
+        venue_split = None
+        if in_game and s_n:
+            at_home = my_team == g0.get("espnHome")
+            here = [x for x in season if x["home"] == at_home]
+            if here:
+                vh = sum(1 for x in here if x["v"] > line)
+                venue_split = {"home": at_home, "n": len(here), "hits": vh}
+                if len(here) >= 3 and s_pct is not None:
+                    n_ = max(-4, min(4, round((100 * vh / len(here) - s_pct) * 0.15)))
+                    if n_:
+                        nudges["venue"] = n_
+        log = logs.get(p["player"], [])
+        tm = None
+        if league == "nba":
+            # minutes trend: last 5 games vs season average (a role change shows up here first)
+            mins = [g["stats"].get("minutes") for g in log if g.get("cur") and g["stats"].get("minutes")]
+            if len(mins) >= 5:
+                l5m, sm = sum(mins[:5]) / 5, sum(mins) / len(mins)
+                if sm and abs(l5m - sm) >= 3:
+                    nudges["minutes"] = max(-5, min(5, round((l5m / sm - 1) * 30)))
+            # back-to-back: played yesterday
+            if log and g0.get("start"):
+                gday = dt.datetime.fromisoformat(g0["start"].replace("Z", "+00:00")).astimezone(ET).date()
+                if log[0]["date"] == (gday - dt.timedelta(days=1)).isoformat():
+                    nudges["b2b"] = -2
+            # teammate out: his numbers this season in games his biggest OUT teammate missed
+            pid = str(ids.get(p["player"]) or "")
+            if nbx and in_game and pid and all(k in nba_mod.FIELD for k in keys):
+                if my_team not in role_cache:
+                    outs = []
+                    for iid, inj in injuries.items():
+                        if inj.get("team") == my_team and inj.get("status") in OUT_STATUSES:
+                            n_g, mpg = nbx.role(iid, my_team)
+                            if n_g >= 3 and mpg >= 20:
+                                outs.append((mpg, iid, inj.get("name") or ""))
+                    role_cache[my_team] = sorted(outs, reverse=True)
+                outs = [o for o in role_cache[my_team] if o[1] != pid]
+                if outs:
+                    mpg, mate, mname = outs[0]
+                    if (pid, mate) not in split_cache:
+                        split_cache[(pid, mate)] = nbx.without(pid, my_team, mate)
+                    sp = split_cache[(pid, mate)]
+                    val = lambda row: sum(row[nba_mod.FIELD[k]] for k in keys)
+                    wo, w = [val(r) for r in sp["wo"]], [val(r) for r in sp["w"]]
+                    if len(wo) >= 2:
+                        tm = {"name": mname, "min": round(mpg, 1), "n": len(wo),
+                              "hits": sum(1 for x in wo if x > line), "avg": round(sum(wo) / len(wo), 1),
+                              "nW": len(w), "hitsW": sum(1 for x in w if x > line),
+                              "avgW": round(sum(w) / len(w), 1) if w else None}
+                        if len(wo) >= 3 and s_pct is not None:
+                            n_ = max(-8, min(8, round((100 * tm["hits"] / tm["n"] - s_pct) * 0.25)))
+                            if n_:
+                                nudges["teammate"] = n_
+        total = max(-12, min(12, sum(nudges.values())))
+        proj = max(1, min(99, proj_base + total))
         gb = board.setdefault(gid, {"players": {}})
         if p["player"] not in gb["players"]:
             g = games[gid]
@@ -549,7 +628,11 @@ def build(league):
                                           "pid": ids.get(p["player"]),
                                           "injury": injuries.get(str(ids.get(p["player"]))),
                                           "badges": badges(person, g, teams, venue),
-                                          "vs": versus(logs.get(p["player"], []), person, g, teams)}
+                                          "vs": versus(logs.get(p["player"], []), person, g, teams),
+                                          # last 20 games (newest first) for the bar chart: date, opp, home, minutes
+                                          "gl": [[x["date"][5:], x["opp"], 0 if x["atVs"] == "@" else 1,
+                                                  x["stats"].get("minutes"), 1 if x.get("cur") else 0]
+                                                 for x in logs.get(p["player"], [])[:20]]}
         pl = gb["players"][p["player"]]
         vs_games = pl["vs"]["_games"] if pl["vs"] else []
         vv = []
@@ -571,6 +654,9 @@ def build(league):
             "season": {"n": s_n, "hits": s_hits, "pct": s_pct, "avg": s_avg},
             "vegas": vg, "vegasU": vgu,
             "proj": proj, "form": form, "projBase": proj_base, "matchup": matchup,
+            "nudges": nudges, "tm": tm, "venue": venue_split,
+            # this stat in each of the player's last 20 games (lines up with the player's "gl")
+            "v": [stat_value(x["stats"], keys, label) for x in logs.get(p["player"], [])[:20]],
             "call": c, "strong": c != "out" and not low and calib.strong(proj), "low": low,
             "keys": keys,
             # career vs today's opponent: shown in the player's dropdown, not used in "proj"
@@ -589,7 +675,8 @@ def build(league):
         for pl in players:
             pl["props"].sort(key=lambda x: -x["proj"])
             # the line under the name: the player's main stat for his position, else any prop with a matchup
-            main = {"QB": "Pass Yds", "RB": "Rush Yds", "WR": "Rec Yds", "TE": "Rec Yds"}
+            main = {"QB": "Pass Yds", "RB": "Rush Yds", "WR": "Rec Yds", "TE": "Rec Yds",
+                    "G": "Points", "F": "Points", "C": "Rebounds"}
             ms = [x for x in pl["props"] if x.get("matchup")]
             pick = next((x for x in ms if x["stat"] == main.get(x["matchup"]["pos"])), ms[0] if ms else None)
             pl["matchup"] = {**pick["matchup"], "stat": pick["stat"]} if pick else None

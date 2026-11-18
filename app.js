@@ -26,7 +26,68 @@ function when(iso){
   return d.toLocaleString([], {weekday:"short", month:"short", day:"numeric", hour:"numeric", minute:"2-digit"});
 }
 let special = false;
-const POSN = {QB: "QBs", RB: "RBs", WR: "WRs", TE: "TEs"};
+const POSN = {QB: "QBs", RB: "RBs", WR: "WRs", TE: "TEs", G: "guards", F: "forwards", C: "centers"};
+// ---- new signals: what nudged each projection, player flags, and the per-prop chart
+const NUDGE_LABEL = {matchup: "matchup", venue: "home/away", minutes: "minutes", b2b: "back-to-back", teammate: "teammate out"};
+const sgn = v => (v > 0 ? "+" : "−") + Math.abs(v);
+const nudgeTxt = x => Object.entries(x.nudges || {}).map(([k, v]) => `${sgn(v)} ${NUDGE_LABEL[k] || k}`).join(" · ");
+const propOpen = new Set(), propSample = {};
+function gameRows(p, x){
+  return (p.gl || []).map((g, i) => ({d: g[0], opp: g[1], h: g[2], min: g[3], cur: g[4], v: (x.v || [])[i]})).filter(r => r.v != null);
+}
+function playerFlags(p){
+  const out = [];
+  const n = (p.props[0] || {}).nudges || {};
+  if (n.b2b) out.push(`<span class="flag" title="Played yesterday: tired legs; projections lowered 2 points">😴 Back-to-back</span>`);
+  const mins = (p.gl || []).filter(g => g[4] && g[3]).map(g => g[3]);
+  if (mins.length >= 5) {
+    const l5 = mins.slice(0, 5).reduce((a, b) => a + b, 0) / 5, se = mins.reduce((a, b) => a + b, 0) / mins.length;
+    if (Math.abs(l5 - se) >= 3) out.push(`<span class="flag ${l5 > se ? "u" : "d"}" title="Minutes per game, last 5 vs this season: a role change shows up here first">⏱ Minutes ${l5 > se ? "▲" : "▼"} ${l5.toFixed(0)} (season ${se.toFixed(0)})</span>`);
+  }
+  const t = p.props.find(x => x.tm)?.tm;
+  if (t) out.push(`<span class="flag" title="${esc(t.name)} (${t.min} min/game) is out today. Tap a prop to see how this player did without him.">🚑 ${esc(t.name)} out</span>`);
+  return out.length ? `<span class="flags">${out.join("")}</span>` : "";
+}
+function altLines(line){
+  const step = line < 3 ? 1 : line < 10 ? 1 : line < 20 ? 2 : line < 40 ? 3 : line < 100 ? 5 : 10;
+  const out = [];
+  for (let k = -2; k <= 3; k++) { const a = Math.round((line + k * step) * 2) / 2; if (a > 0 && !out.includes(a)) out.push(a); }
+  return out;
+}
+function chartPanel(p, x, key){
+  const S = propSample[key] || "10";
+  const rows = gameRows(p, x);
+  const pick = S === "season" ? rows.filter(r => r.cur) : rows.slice(0, +S);
+  const n = pick.length, hit = pick.filter(r => r.v > x.line).length;
+  const avg = n ? pick.reduce((a, r) => a + r.v, 0) / n : 0;
+  const arr = [...pick].reverse();
+  const max = Math.max(x.line * 1.3, ...arr.map(r => r.v), 1);
+  const W = 26, H = 120, top = 14, base = top + H, width = Math.max(arr.length * W + 8, 120);
+  const y = v => base - (v / max) * H;
+  const bars = arr.map((r, i) => {
+    const h = Math.max(2, base - y(r.v)), xx = 4 + i * W;
+    return `<rect x="${xx}" y="${base - h}" width="${W - 6}" height="${h}" rx="2" class="${r.v > x.line ? "bh" : "bm"}"><title>${esc(r.d)} ${r.h ? "vs" : "@"} ${esc(r.opp)}: ${f1(r.v)}${r.min ? ` (${r.min} min)` : ""}</title></rect>
+      <text x="${xx + (W - 6) / 2}" y="${base - h - 3}" class="bv">${f1(r.v)}</text>
+      <text x="${xx + (W - 6) / 2}" y="${base + 11}" class="bo">${esc(r.opp)}</text>`;
+  }).join("");
+  const chart = n ? `<svg class="pchart" viewBox="0 0 ${width} ${base + 16}" width="${width}" height="${base + 16}" role="img" aria-label="${esc(x.stat)} in the last ${n} games vs the line ${x.line}">${bars}<line x1="0" x2="${width}" y1="${y(x.line)}" y2="${y(x.line)}" class="bl"/><text x="${width - 2}" y="${y(x.line) - 3}" class="blt">${x.line}</text></svg>` : `<p class="note">No games to chart yet.</p>`;
+  const btn = (v, t) => `<button type="button" data-sample="${v}" aria-pressed="${S === v}">${t}</button>`;
+  const alts = altLines(x.line).map(a => { const h = pick.filter(r => r.v > a).length; return `<span class="${a === x.line ? "cur" : ""}">o${a}: <b>${h}/${n}</b> ${n ? Math.round(100 * h / n) + "%" : ""}</span>`; }).join("");
+  const se = rows.filter(r => r.cur), hm = se.filter(r => r.h), aw = se.filter(r => !r.h);
+  const split = (list, t) => list.length ? `${t} <b>${list.filter(r => r.v > x.line).length}/${list.length}</b> (avg ${f1(list.reduce((a, r) => a + r.v, 0) / list.length)})` : "";
+  const t = x.tm;
+  const tmTxt = t ? `<p class="note">🚑 <b>Without ${esc(t.name)}</b> (out today, ${t.min} min/game): over in <b>${t.hits}/${t.n}</b> games, avg ${t.avg}${t.nW ? ` · with him: ${t.hitsW}/${t.nW}, avg ${t.avgW}` : ""}.${t.n < 3 ? " Small sample: not used in the projection." : ""}</p>` : "";
+  const nt = nudgeTxt(x);
+  return `<div class="pdet">
+    <div class="pseg" role="group" aria-label="Sample">${btn("5", "L5")}${btn("10", "L10")}${btn("20", "L20")}${btn("season", "Season")}</div>
+    <p class="note"><b>${esc(x.stat)} o${x.line}:</b> ${S === "season" ? "This season" : `Last ${n}`} over in <b>${hit}/${n}</b>${n ? ` (${Math.round(100 * hit / n)}%)` : ""} · avg ${f1(avg)}</p>
+    <div class="pscroll">${chart}</div>
+    <div class="alts"><span class="note">Alt lines (${S === "season" ? "season" : `last ${n}`}):</span>${alts}</div>
+    <p class="note">This season: ${[split(hm, "Home"), split(aw, "Away")].filter(Boolean).join(" · ") || "—"}</p>
+    ${tmTxt}
+    ${x.form != null && !x.low ? `<p class="note"><b>How the ${x.proj}% was built:</b> base ${x.projBase}% (60% season + 40% last 5)${nt ? ` ${nt}` : ""} = form ${x.form}%, then 75% form + 25% Vegas (${x.vegas ?? "—"}%).</p>` : ""}
+  </div>`;
+}
 const TIER = {tough: "Tough", easy: "Easy", neutral: "Average"};
 const ord = n => n + (["th","st","nd","rd"][(n % 100 - 20) % 10] || ["th","st","nd","rd"][n % 100] || "th");
 function dvpLine(p){
@@ -227,19 +288,21 @@ function render(){
       const vkey = g.league + g.id + "|" + p.name, vopen = vsOpen.has(vkey);
       const hot = p.props.some(x => x.vs?.hot);
       const out = isOut(p);
-      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} over · ${p.props.filter(x => x.call === "lean").length} lean · ${p.props.filter(x => x.call === "miss").length} under`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}${dvpLine(p)}</td></tr>
+      return `<tr class="player${out ? " isout" : ""}"><td colspan="8"><button type="button" class="pbtn" data-vs="${esc(vkey)}" aria-expanded="${vopen}" title="Show career stats vs today's opponent"><span class="car">▶</span><span class="pn">${esc(p.name)}</span>${hot ? `<span title="Usually goes over vs this team">🔥</span>` : ""}</button><span class="tm">${esc(p.team||"")}</span>${injTag(p)}<span class="ps">${out ? "Not expected to play: no call" : `${pu} over · ${p.props.filter(x => x.call === "lean").length} lean · ${p.props.filter(x => x.call === "miss").length} under`}</span>${(p.badges||[]).map(bd => `<span class="badge ${esc(bd.kind)}" title="${esc(bd.text)}"><span aria-hidden="true">${bd.icon}</span> ${esc(bd.text)}</span>`).join("")}${playerFlags(p)}${dvpLine(p)}</td></tr>
       <tr class="vsrow"${vopen ? "" : " hidden"}><td colspan="8">${vopen ? vsPanel(p) : ""}</td></tr>` +
       p.props.map(x => {
         const se = x.season || {};
         const cells = [...x.last5].reverse().map((v, i, arr) =>
           `<i class="${v.v > x.line ? "h" : "m"}${i===arr.length-1 ? " new" : ""}" title="${esc(v.date)} ${esc(v.atVs)} ${esc(v.opp)}">${f1(v.v)}</i>`).join("");
         if (x.call === "out") return `<tr class="q isout"><td class="stat">${esc(x.stat)}</td><td>${x.line}</td><td colspan="4" style="text-align:left;color:var(--muted)">No call while ${esc(p.injury?.status || "out")}</td><td></td><td class="hit o"><span>OUT</span></td></tr>`;
-        return `<tr class="q"><td class="stat">${esc(x.stat)}</td><td>${x.line}${moveTxt(x)}</td><td><span class="l5">${cells}</span></td>
+        const pk = g.league + g.id + "|" + p.name + "|" + x.stat, popen = propOpen.has(pk);
+        return `<tr class="q"><td class="stat"><button type="button" class="sbtn" data-prop="${esc(pk)}" aria-expanded="${popen}" title="Chart, alt lines and splits"><span class="car">▸</span>${esc(x.stat)}</button></td><td>${x.line}${moveTxt(x)}</td><td><span class="l5">${cells}</span></td>
           <td>${f1(x.avg)}<small class="sub">${x.hits}/5 · ${x.pct}%</small></td>
           <td class="chg ${se.avg > x.line ? "u" : "d"}">${se.avg ?? "—"}<small class="sub">${se.n ? `${se.hits}/${se.n} · ${se.pct}%` : "no games yet"}</small></td>
           <td class="odds">${x.vegas != null ? x.vegas + "%" : "—"}<small class="sub">o ${esc(oddsTxt(x.over))}</small></td>
           ${callBox(x)}${x.low ? `<small class="sub" title="Anytime TD is priced from Vegas alone: the board's form numbers ran far too high on touchdowns.">Low confidence</small>`
-            : x.form != null ? `<small class="sub" title="Form = 60% season + 40% last-5 hit rate${x.matchup ? `, with the matchup nudge (${x.projBase}% before it; opponent ranks ${ord(x.matchup.rank)} toughest, ${x.matchup.allowed}/game vs ${x.matchup.avg} average)` : ""}.">Form ${x.form}%${x.matchup?.nudge ? ` (${x.matchup.nudge > 0 ? "+" : ""}${x.matchup.nudge} matchup)` : ""}</small>` : ""}</td></tr>`;
+            : x.form != null ? `<small class="sub" title="Base ${x.projBase}% (60% season + 40% last 5)${nudgeTxt(x) ? ", nudged by: " + nudgeTxt(x) : ""}. Tap the stat for details.">Form ${x.form}%${x.form !== x.projBase ? ` (${sgn(x.form - x.projBase)})` : ""}</small>` : ""}</td></tr>
+          <tr class="prow"${popen ? "" : " hidden"}><td colspan="8">${popen ? chartPanel(p, x, pk) : ""}</td></tr>`;
       }).join("");
     }).join("");
     return `<details class="game" data-key="${esc(key)}"${open ? " open" : ""}>
@@ -269,6 +332,24 @@ function render(){
     }
     row.hidden = !open;
   }));
+  const findProp = k => {
+    const [gk, name, stat] = k.split("|");
+    const gm = games.find(x => x.league + x.id === gk), pl = gm?.players.find(x => x.name === name);
+    return pl ? [pl, pl.props.find(x => x.stat === stat)] : [];
+  };
+  board.querySelectorAll(".sbtn").forEach(b => b.addEventListener("click", () => {
+    const k = b.dataset.prop, row = b.closest("tr").nextElementSibling, open = !propOpen.has(k);
+    open ? propOpen.add(k) : propOpen.delete(k);
+    b.setAttribute("aria-expanded", String(open));
+    if (open) { const [pl, x] = findProp(k); row.firstElementChild.innerHTML = pl && x ? chartPanel(pl, x, k) : ""; }
+    row.hidden = !open;
+  }));
+  if (!board.dataset.sampleBound) board.dataset.sampleBound = "1", board.addEventListener("click", e => {
+    const sb = e.target.closest("[data-sample]"); if (!sb) return;
+    const row = sb.closest("tr.prow"), k = row?.previousElementSibling?.querySelector(".sbtn")?.dataset.prop; if (!k) return;
+    propSample[k] = sb.dataset.sample;
+    const [pl, x] = findProp(k); if (pl && x) row.firstElementChild.innerHTML = chartPanel(pl, x, k);
+  });
   board.querySelectorAll("details.game").forEach(d => d.addEventListener("toggle", () => {
     d.open ? openState.add(d.dataset.key) : openState.delete(d.dataset.key);
   }));

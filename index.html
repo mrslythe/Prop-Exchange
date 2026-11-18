@@ -185,6 +185,26 @@ tr.player .tm{color:var(--amber);font-weight:600;margin-left:8px;font-size:12px}
 tr.player .ps{color:var(--muted);font-size:12px;margin-left:10px}
 tr.q:hover td{background:var(--panel2)}
 td.stat{color:var(--fg);padding-left:22px}
+.sbtn{all:unset;cursor:pointer;display:inline-flex;gap:6px;align-items:center}
+.sbtn .car{color:var(--amber);font-size:10px;transition:transform .15s}
+.sbtn[aria-expanded="true"] .car{transform:rotate(90deg)}
+.sbtn:hover{color:var(--amber)} .sbtn:focus-visible{outline:2px solid var(--amber);outline-offset:2px}
+tr.prow td{background:var(--panel2);padding:10px 14px 12px 22px;border-bottom:1px solid var(--rule);white-space:normal;text-align:left}
+.pdet{display:grid;gap:6px;position:sticky;left:0;width:min(1000px,calc(100vw - 72px))}
+.pdet .note{margin:0}
+.pseg{display:inline-flex;gap:4px}
+.pseg button{all:unset;cursor:pointer;font-size:12px;padding:3px 10px;border:1px solid var(--rule);border-radius:3px;color:var(--muted)}
+.pseg button[aria-pressed="true"]{background:var(--amber);color:#1a1300;border-color:var(--amber)}
+.pscroll{overflow-x:auto;max-width:100%}
+.pchart .bh{fill:var(--up)} .pchart .bm{fill:var(--down)}
+.pchart .bl{stroke:var(--amber);stroke-dasharray:4 3;stroke-width:1.5}
+.pchart text{font-size:9px;text-anchor:middle;fill:var(--muted);font-family:var(--mono)}
+.pchart .bv{fill:var(--fg)} .pchart .blt{text-anchor:end;fill:var(--amber)}
+.alts{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:12px;align-items:baseline}
+.alts .cur{color:var(--amber)}
+.flags{display:inline-flex;flex-wrap:wrap;gap:4px;margin-left:8px;vertical-align:middle}
+.flag{font-size:11px;padding:1px 6px;border:1px solid var(--rule);border-radius:3px;color:var(--muted);white-space:nowrap}
+.flag.u{color:var(--up);border-color:var(--up)} .flag.d{color:var(--down);border-color:var(--down)}
 .l5{display:inline-flex;gap:3px}
 .l5 i{font-style:normal;display:inline-block;min-width:38px;padding:1px 4px;text-align:center;border-radius:2px;font-size:12px}
 .l5 i.h{background:var(--up-bg);color:var(--up)} .l5 i.m{background:var(--down-bg);color:var(--down)}
@@ -254,6 +274,8 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
       <li><b>Line:</b> consensus from scoresandodds.com (midpoint of the best over and under).</li>
       <li><b>Form %:</b> 60% season hit rate + 40% last-5 hit rate over the line.</li>
       <li><b>Projected %:</b> 75% Form % + 25% the Vegas % of the over. <b>▲ OVER</b> (green) 58%+, <b>◆ LEAN</b> (yellow) 46–57%, <b>▼ UNDER</b> (red) 45% or less. <b>STRONG</b> = 70%+ over or 30% or less under.</li>
+      <li><b>Tap a stat</b> for a bar chart of the last 5/10/20/season games vs the line, alt-line hit rates, home/away splits, the teammate-out split and how the projection was built.</li>
+      <li><b>Nudges:</b> the base % (60% season + 40% last 5) is nudged by the matchup (defense vs the player's position, NFL and NBA, up to ±8), home/away (±4), NBA minutes trend (±5), back-to-back (−2) and an OUT teammate (NBA, ±8, needs 3+ games without him). Total nudge is capped at ±12.</li>
       <li><b>Line moves:</b> ▲/▼ under the line shows how far it moved since the board first saw it today. Rising usually means money on the over. The board refreshes hourly 10 AM–8 PM ET.</li>
       <li><b>Game lines:</b> each game header shows a call on the total (how often each team's games went over that number, 60% season + 40% last 5, plus 25% Vegas) and on the spread (how often the away team would have covered and the home team failed to). Same colors; the spread names the likelier side.</li>
       <li><b>Daily Sheet tab:</b> a one-page sheet of today's game-line calls, green overs and strong unders, printable and emailed daily.</li>
@@ -280,6 +302,6 @@ td small.sub{display:block;font-size:11px;color:var(--muted);font-weight:400}
   </section>
 </main>
 
-<script src="app.js?v=3"></script>
+<script src="app.js?v=4"></script>
 </body>
 </html>
