@@ -85,7 +85,7 @@ details[open] .caret{transform:rotate(90deg)}
 .slist li b{font-weight:600}
 .slist .u{color:var(--up)} .slist .d{color:var(--down)}
 .slabel{font-size:11px;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
-@media print{header,.tabs,#viewBoard,#viewPenalty,.noprint{display:none!important} body{background:#fff;color:#000} .sgame{background:#fff;border-color:#999} .slist .u{color:#06612e} .slist .d{color:#9b1c1c} .gl{color:#333;border-color:#999} .gl b{color:#000} .shead h2{color:#000}}
+@media print{header,.tabs,#viewBoard,#viewPenalty,#viewBlue,.noprint{display:none!important} body{background:#fff;color:#000} .sgame{background:#fff;border-color:#999} .slist .u{color:#06612e} .slist .d{color:#9b1c1c} .gl{color:#333;border-color:#999} .gl b{color:#000} .shead h2{color:#000}}
 .gcount{display:flex;gap:6px;font-weight:600}
 .pill{padding:2px 7px;border-radius:2px;font-size:12px}
 .pill.s{background:var(--panel2);color:var(--fg);border:1px solid var(--rule)}
@@ -268,7 +268,8 @@ td small.sub{margin-top:2px}
   .top.showfilt .filt{display:flex;width:100%}
   .filt select,.filt input{flex:1 1 140px;min-height:40px;width:auto}
   .tape-inner{padding:4px 0}
-  .tabs a{font-size:15px;padding:8px 10px}
+  .tabs{overflow-x:auto;white-space:nowrap;scrollbar-width:none}
+  .tabs a{font-size:14px;padding:8px 9px;flex:none}
   /* each prop becomes a card: stat + call on top, last 5 across, then averages */
   .game .tbl{overflow:visible}
   .game table{min-width:0;display:block}
@@ -330,7 +331,7 @@ td small.sub{margin-top:2px}
 </header>
 
 <main class="gut">
-  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penny-blocks" id="tabPenalty">Penny Blocks</a><a href="#daily-sheet" id="tabSheet">Daily Sheet</a></nav>
+  <nav class="tabs" aria-label="Views"><a href="#board" id="tabBoard" aria-current="page">Board</a><a href="#penny-blocks" id="tabPenalty">Penny Blocks</a><a href="#blue-chips" id="tabBlue">Blue Chips</a><a href="#daily-sheet" id="tabSheet">Daily Sheet</a></nav>
   <div id="viewBoard" style="display:grid;gap:12px">
   <section class="intro" aria-label="About this board">
     <p>Daily NFL &amp; NBA player props vs the Vegas line. Updated hourly.</p>
@@ -353,6 +354,7 @@ td small.sub{margin-top:2px}
       <li><b>Nudges:</b> the base % (60% season + 40% last 5) is nudged by the matchup (defense vs the player's position, NFL and NBA, up to ±8), home/away (±4), NBA minutes trend (±5), back-to-back (−2) and an OUT teammate (NBA, ±8, needs 3+ games without him). Total nudge is capped at ±12.</li>
       <li><b>Line moves:</b> ▲/▼ under the line shows how far it moved since the board first saw it today. Rising usually means money on the over. The board refreshes hourly 10 AM–8 PM ET.</li>
       <li><b>Game lines:</b> each game header shows a call on the total (how often each team's games went over that number, 60% season + 40% last 5, plus 25% Vegas) and on the spread (how often the away team would have covered and the home team failed to). Same colors; the spread names the likelier side.</li>
+      <li><b>Blue Chips tab:</b> players with big lines (12.5+ pts, 4.5+ reb/ast, 20.5+ PRA; NFL yards and receptions) who went over both their last line and today's line in their last game. Every qualifier listed and tracked.</li>
       <li><b>Daily Sheet tab:</b> a one-page sheet of today's game-line calls, green overs and strong unders, printable and emailed daily.</li>
       <li><b>Anytime TD:</b> priced from Vegas alone and marked low confidence. 0.5 steals and blocks lines are left off.</li>
       <li><b>NFL matchup:</b> what today's defense allows this season to the player's position for that stat, ranked 1 (toughest) to 32. It nudges Form % up to 8 points either way.</li>
@@ -372,11 +374,16 @@ td small.sub{margin-top:2px}
     <div class="pgrid" id="pgrid"><div class="empty"><b>Loading parlays</b>The parlays appear here after the board loads.</div></div>
     <p class="pnote"><b>Building it in the app:</b> "Hard Rock" and "PrizePicks" open their site or app; add the picks yourself. "Copy picks" puts the legs on your clipboard. Payouts use the best over price across sportsbooks, so Hard Rock's price can differ, and PrizePicks uses its own lines and payouts and may not offer every prop. <b>Combined chance</b> multiplies each leg's Projected %, so it assumes the legs are independent; same-game legs tend to win or lose together. For entertainment only. 21+. If you or someone you know has a gambling problem, call 1-800-GAMBLER.</p>
   </section>
+  <section id="viewBlue" hidden style="display:grid;gap:14px">
+    <p class="pnote"><b>Blue Chips</b> are big-line players riding a hot game: today's line is at least 12.5 points, 4.5 rebounds, 4.5 assists or 20.5 PRA (NFL: 224.5 passing, 59.5 rushing or 54.5 receiving yards, 4.5 receptions), and in his last game he beat <b>both</b> his line that night and today's line. No projections, just the hot hand. Every qualifier is listed, biggest margin first; the payout is for parlaying all of them.</p>
+    <div class="precord" id="brecord">Blue Chips record loading…</div>
+    <div class="pgrid" id="bgrid"><div class="empty"><b>Loading Blue Chips</b>They appear here after the board loads.</div></div>
+  </section>
   <section id="viewSheet" hidden style="display:grid;gap:14px">
     <div class="sheet" id="sheet"><div class="empty"><b>Loading today's sheet</b>The Daily Sheet appears here after the board loads.</div></div>
   </section>
 </main>
 
-<script src="app.js?v=5"></script>
+<script src="app.js?v=6"></script>
 </body>
 </html>

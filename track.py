@@ -354,6 +354,7 @@ def summarize(data_dir, now):
     rec["parlays"]["week"] = pw.get(this_week, {"n": 0, "won": 0, "profit": 0.0})
     rec["parlays"]["weeks"] = {w: pw[w] for w in sorted(pw, reverse=True)[:26]}
     rec["games"] = summarize_games(data_dir, this_week)
+    rec["bluechips"] = summarize_bluechips(data_dir, week_of, this_week)
     with open(f"{data_dir}/record.json", "w") as f:
         json.dump(rec, f, separators=(",", ":"))
     return rec
@@ -449,3 +450,71 @@ def summarize_games(data_dir, this_week=None):
                            "pick": p.get("pick") or f"{p['side'].title()} {p['line']:g}", "proj": p["proj"],
                            "a": p["a"], "won": won})
     return {"by": out, "week": wk, "recent": recent[-20:][::-1]}
+
+
+# ---------------- Blue Chips (big lines that went over last game) ----------------
+def record_bluechips(board, data_dir, now):
+    """Save each Blue Chips qualifier under its game's date until the game starts."""
+    os.makedirs(f"{data_dir}/bluechips", exist_ok=True)
+    files = {}
+    for card in board.get("bluechips", []):
+        for l in card.get("legs", []):
+            start = _start(l.get("start"))
+            if not start or start <= now or not l.get("event") or not l.get("pid"):
+                continue
+            day = start.astimezone(ET).date().isoformat()
+            path = f"{data_dir}/bluechips/{day}.json"
+            data = files.setdefault(path, _load(path))
+            data.setdefault("legs", {})
+            key = f"{card['league']}|{l['event']}|{l['pid']}|{card['stat']}"
+            data["legs"][key] = {"lg": card["league"], "s": card["stat"], "n": l["name"], "line": l["line"],
+                                 "odds": l["odds"], "margin": l["margin"], "last": l["last"], "st": l["start"]}
+    for path, data in files.items():
+        _save(path, {"picks": data.get("picks", {}), "legs": data["legs"]})
+
+
+def summarize_bluechips(data_dir, week_of, this_week):
+    """Each qualifier as its own $10 over bet, plus each day's all-qualifiers parlay per stat."""
+    results = {}
+    for path in sorted(glob.glob(f"{data_dir}/picks/*.json")):
+        for key, p in _load(path)["picks"].items():
+            results[key] = p.get("r")
+    blank = lambda: {"n": 0, "hit": 0, "P": 0.0}
+    tot, wk, by_stat, pars, recent = blank(), blank(), {}, [], []
+    for path in sorted(glob.glob(f"{data_dir}/bluechips/*.json")):
+        day = os.path.basename(path)[:-5]
+        legs = _load(path).get("legs") or {}
+        groups = {}
+        for key, l in legs.items():
+            r = results.get(key)
+            groups.setdefault((l["lg"], l["s"]), []).append((l, r))
+            if r not in ("over", "under"):
+                continue
+            won = r == "over"
+            dec = _dec(l.get("odds"))
+            pr = STAKE * (dec - 1) if (won and dec) else (0 if won else -STAKE)
+            for b in [tot, by_stat.setdefault(f"{l['lg']} {l['s']}", blank())] + ([wk] if week_of(day) == this_week else []):
+                b["n"] += 1
+                b["hit"] += won
+                b["P"] = round(b["P"] + pr, 2)
+        for (lg, s), items in groups.items():
+            rs = [r for _, r in items]
+            if len(items) < 2:
+                continue
+            if any(r == "under" for r in rs):
+                res = "lost"
+            elif any(r is None for r in rs):
+                res = "pending"
+            else:
+                res = "won" if any(r == "over" for r in rs) else "void"
+            dec = 1.0
+            for l, r in items:
+                if r == "over":
+                    dec *= _dec(l.get("odds")) or 1
+            pars.append({"d": day, "lg": lg, "s": s, "legs": len(items), "res": res,
+                         "profit": round(STAKE * (dec - 1), 2) if res == "won" else (-STAKE if res == "lost" else 0)})
+    done = [p for p in pars if p["res"] in ("won", "lost")]
+    return {"legs": tot, "week": wk, "byStat": by_stat,
+            "parlays": {"n": len(done), "won": sum(p["res"] == "won" for p in done),
+                        "profit": round(sum(p["profit"] for p in done), 2),
+                        "recent": [p for p in pars if p["res"] != "pending"][-12:][::-1]}}

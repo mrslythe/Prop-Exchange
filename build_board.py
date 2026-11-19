@@ -629,9 +629,9 @@ def build(league):
                                           "injury": injuries.get(str(ids.get(p["player"]))),
                                           "badges": badges(person, g, teams, venue),
                                           "vs": versus(logs.get(p["player"], []), person, g, teams),
-                                          # last 20 games (newest first) for the bar chart: date, opp, home, minutes
+                                          # last 20 games (newest first) for the bar chart: date, opp, home, minutes, this season, ESPN event
                                           "gl": [[x["date"][5:], x["opp"], 0 if x["atVs"] == "@" else 1,
-                                                  x["stats"].get("minutes"), 1 if x.get("cur") else 0]
+                                                  x["stats"].get("minutes"), 1 if x.get("cur") else 0, x.get("event")]
                                                  for x in logs.get(p["player"], [])[:20]]}
         pl = gb["players"][p["player"]]
         vs_games = pl["vs"]["_games"] if pl["vs"] else []
@@ -728,6 +728,12 @@ if __name__ == "__main__":
             print(f"{lg} game lines unavailable:", e, file=sys.stderr)
     import penalty
     board["parlays"] = penalty.build(board["games"])
+    import bluechips
+    try:
+        board["bluechips"] = bluechips.build(board["games"], data_dir)
+    except Exception as e:  # extra feature: never block the board
+        print("Blue Chips unavailable:", e, file=sys.stderr)
+        board["bluechips"] = []
     import sheet
     os.makedirs(data_dir, exist_ok=True)
     if board["games"]:
@@ -743,6 +749,7 @@ if __name__ == "__main__":
     saved = track.record_picks(board, data_dir, now)
     track.record_parlays(board, data_dir, now)
     track.record_games(board, data_dir, now)
+    track.record_bluechips(board, data_dir, now)
     graded = track.grade(data_dir, now)
     graded += track.grade_games(data_dir, now)
     rec = track.summarize(data_dir, now)

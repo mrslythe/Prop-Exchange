@@ -113,8 +113,8 @@ function dvpLine(p){
 let parlays = [], rec = null;
 const HARDROCK = "https://www.hardrock.bet/", PRIZEPICKS = "https://app.prizepicks.com/";
 function showView(){
-  const v = (location.hash === "#penny-blocks" || location.hash === "#penalty-stocks") ? "penalty" : location.hash === "#daily-sheet" ? "sheet" : "board";
-  [["board", "viewBoard", "tabBoard"], ["penalty", "viewPenalty", "tabPenalty"], ["sheet", "viewSheet", "tabSheet"]].forEach(([k, view, tab]) => {
+  const v = (location.hash === "#penny-blocks" || location.hash === "#penalty-stocks") ? "penalty" : location.hash === "#daily-sheet" ? "sheet" : location.hash === "#blue-chips" ? "blue" : "board";
+  [["board", "viewBoard", "tabBoard"], ["penalty", "viewPenalty", "tabPenalty"], ["blue", "viewBlue", "tabBlue"], ["sheet", "viewSheet", "tabSheet"]].forEach(([k, view, tab]) => {
     $(view).hidden = v !== k; $(view).style.display = v === k ? "grid" : "none";
     $(tab).setAttribute("aria-current", v === k ? "page" : "false");
   });
@@ -166,6 +166,36 @@ function renderSheet(){
   const pb = $("sheetPrint"); if (pb) pb.addEventListener("click", () => window.print());
 }
 fetch("data/sheet.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(d => { sheetData = d; renderSheet(); }).catch(() => {});
+let blueChips = [];
+function blueText(c){
+  return `Prop Exchange Blue Chips: ${c.league} ${c.stat} (${c.legs.length} legs${c.american ? ", " + c.american : ""})\n` +
+    c.legs.map(l => `${l.name} over ${l.line} ${c.stat} (last game ${f1(l.last.v)})`).join("\n");
+}
+function renderBlue(){
+  const el = $("bgrid"); if (!el) return;
+  const list = blueChips.filter(c => league === "ALL" || c.league === league);
+  const bc = rec?.bluechips, L = bc?.legs, W = bc?.week, P = bc?.parlays;
+  const pc = (h, n) => n ? Math.round(100 * h / n) + "%" : "—";
+  $("brecord").innerHTML = L && L.n
+    ? `<span>Players this week <b>${W?.hit ?? 0} of ${W?.n ?? 0}</b> went over${W?.n ? ` · ${money(W.P)}` : ""}</span><span>All-time <b>${L.hit} of ${L.n}</b> (${pc(L.hit, L.n)}) · ${money(L.P)} betting $10 on each</span>${P?.n ? `<span>Full parlays <b>${P.won} of ${P.n}</b> hit · ${money(P.profit)}</span>` : ""}`
+    : `<span>No Blue Chips graded yet. Each qualifier is saved before his game and graded after it.</span>`;
+  if (!list.length) { el.innerHTML = `<div class="empty"><b>No Blue Chips right now</b>They fill in once Vegas posts props.</div>`; return; }
+  el.innerHTML = list.map((c, i) => {
+    const head = `<header><h3><small>${esc(c.league)} · ${esc(c.stat)} ${c.min}+ · ${c.legs.length} player${c.legs.length === 1 ? "" : "s"}</small>${esc(c.stat)}</h3>${c.american ? `<div class="pay"><b>${esc(c.american)}</b><small>all ${c.legs.length}: $10 pays $${(10 * c.dec).toFixed(0)}</small></div>` : ""}</header>`;
+    if (!c.legs.length) return `<article class="pcard">${head}<p class="pnote" style="padding:12px 14px">Nobody with a ${c.min}+ line went over both his last line and today's line in his last game.</p></article>`;
+    const legs = c.legs.map(l => `<li><span class="ln">${esc(l.name)}<span>${esc(l.team || "")}</span></span>
+        <span class="lg">Over ${l.line} · last game <b>${f1(l.last.v)}</b> ${l.last.home ? "vs" : "@"} ${esc(l.last.opp)} (line ${l.last.line}) · ${esc(when(l.start))}</span>
+        <span class="lp"><b>+${l.margin}</b><small>${esc(l.odds)}</small></span></li>`).join("");
+    return `<article class="pcard">${head}<ul class="legs">${legs}</ul>
+      <div class="pmath"><span>+ = how far last game cleared today's line</span></div>
+      <div class="pbtns">
+        <a class="hr" href="${HARDROCK}" target="_blank" rel="noopener">Hard Rock</a>
+        <a class="pp" href="${PRIZEPICKS}" target="_blank" rel="noopener">PrizePicks</a>
+        <button type="button" data-bcopy="${i}">Copy picks</button>
+      </div></article>`;
+  }).join("");
+  el.querySelectorAll("[data-bcopy]").forEach(b => b.addEventListener("click", () => copyPicks(b, blueText(list[Number(b.dataset.bcopy)]))));
+}
 function renderPenalty(){
   const list = parlays.filter(p => league === "ALL" || p.league === league);
   const pr = rec?.parlays;
@@ -247,7 +277,7 @@ function oddsTxt(o){ return o ? `${o.line} ${o.odds}` : "—"; }
 
 function render(){
   document.querySelectorAll("[data-lg]").forEach(b => b.setAttribute("aria-pressed", String(b.dataset.lg === league)));
-  renderPenalty(); renderSheet();
+  renderPenalty(); renderBlue(); renderSheet();
   const list = games.filter(g => league === "ALL" || g.league === league).sort((a,b) => (a.start||"").localeCompare(b.start||""));
 
   // stat options
@@ -436,7 +466,7 @@ function renderRecord(r){
   </div><p class="rnote">Calls are saved just before each game starts and graded against ESPN's final stats. Each week runs Monday to Sunday by the game's Eastern date and starts fresh; past weeks stay in the table and in the all-time totals. Pushes and players who did not play are not counted. Over and Under counts are green and red calls; yellow leans are counted separately. <b>Dollar amounts</b> are the profit or loss from betting $10 on every call at the best price when it was saved (a win pays the odds, a loss costs $10). At standard −110 odds you need to win 52.4% just to break even. Red anytime-TD calls are left out: there is no "no TD" bet on the board. ★ = strong call. ${r.pending ? `${r.pending} calls still waiting on their games.` : ""}</p>${old}`;
 }
 fetch("data/record.json?t=" + Date.now(), {cache: "no-store"}).then(r => r.ok ? r.json() : null).then(r => {
-  if (r) { rec = r; renderRecord(r); renderPenalty(); } else document.querySelector("#record .rstat").textContent = "Results will appear after the first games are graded.";
+  if (r) { rec = r; renderRecord(r); renderPenalty(); renderBlue(); } else document.querySelector("#record .rstat").textContent = "Results will appear after the first games are graded.";
 }).catch(() => { document.querySelector("#record .rstat").textContent = "Results could not be loaded."; });
 
 showView();
@@ -448,6 +478,7 @@ showView();
     run = {run: b.run, createdAt: b.createdAt, leagues: b.leagues};
     games = b.games || [];
     parlays = b.parlays || [];
+    blueChips = b.bluechips || [];
     render();
   } catch (e) {
     $("status").innerHTML = `<span class="d">The board data could not be loaded. Refresh the page to try again.</span>`;
