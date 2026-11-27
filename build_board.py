@@ -640,14 +640,15 @@ def build(league):
             vv.append(stat_value(vg["stats"], keys, label))
         got = [x for x in vv if x is not None]
         vs_hits = sum(1 for x in got if x > line)
-        # "form" is the last-5 + season blend (with the NFL matchup nudge). "proj" mixes in a little
-        # of the Vegas price (calib.py).
+        # "form" is the last-5 + season blend plus the nudges. "proj" is the chance of the over from
+        # the weekly-refit model (calib.py); the call compares it to each side's price.
         vg = implied(p["over"]["odds"]) if p["over"] else None
         vgu = implied(p["under"]["odds"]) if p["under"] else None
         form = proj
         low = label in calib.LOW_CONF
-        proj = calib.td_chance(vg) if low else calib.project(form, vg)
-        c = "out" if (pl["injury"] or {}).get("status") in OUT_STATUSES else calib.call(proj)
+        proj = calib.td_chance(vg) if low else calib.project(form, vg, vgu, league.upper())
+        dec = calib.decide(proj, (p["over"] or {}).get("odds"), (p["under"] or {}).get("odds") if not low else None, low)
+        c = "out" if (pl["injury"] or {}).get("status") in OUT_STATUSES else dec["call"]
         pl["props"].append({
             "stat": label, "line": line, "over": p["over"], "under": p["under"],
             "last5": last, "hits": hits, "pct": l5_pct, "avg": avg,
@@ -657,7 +658,8 @@ def build(league):
             "nudges": nudges, "tm": tm, "venue": venue_split,
             # this stat in each of the player's last 20 games (lines up with the player's "gl")
             "v": [stat_value(x["stats"], keys, label) for x in logs.get(p["player"], [])[:20]],
-            "call": c, "strong": c != "out" and not low and calib.strong(proj), "low": low,
+            "call": c, "side": dec["side"], "chance": dec["chance"], "edge": dec["edge"],
+            "strong": c != "out" and dec["strong"], "low": low,
             "keys": keys,
             # career vs today's opponent: shown in the player's dropdown, not used in "proj"
             "vs": {"n": len(got), "hits": vs_hits, "avg": round(sum(got) / len(got), 1) if got else None,
@@ -691,7 +693,7 @@ def build(league):
         "league": league.upper(),
         "updatedAt": dt.datetime.now(dt.timezone.utc).isoformat(timespec="seconds"),
         "source": f"Lines: scoresandodds.com/{league}/props and /{league}. Last 5 games, season and career stats: ESPN game logs.",
-        "rule": "Form % = 60% season hit rate + 40% last-5 hit rate against the consensus line. Projected % = 75% Form % + 25% Vegas %. Green OVER 58%+, yellow LEAN 46-57%, red UNDER 45% or less.",
+        "rule": "Projected % = chance of the over from a model refit every Monday on the last 14 days of results (Vegas with the cut removed + Form). Green PLAY: the better side beats its price by 3+ points; yellow LEAN 0-3; red PASS.",
         "propsSeen": len(props), "propsSkipped": skipped,
         "games": out_games,
     }
@@ -706,7 +708,24 @@ if __name__ == "__main__":
     board = {"run": now.strftime("r%Y%m%dT%H%M%S"), "createdAt": now.isoformat(timespec="seconds"),
              "leagues": {}, "games": []}
     errors = 0
+    import calib
     import lines
+    import gamelines
+    import ratings
+    # season results for the power ratings (game lines) and the weekly refit
+    season = {}
+    for lg in ("nfl", "nba"):
+        try:
+            season[lg] = ratings.season_games(lg)
+        except Exception as e:
+            print(f"{lg} season results unavailable:", e, file=sys.stderr)
+            season[lg] = None
+    if calib.due(data_dir, now.astimezone(ET)):
+        fit = calib.refit(data_dir, now.astimezone(ET).date(),
+                          games_fn=lambda d, t: gamelines.refit_weights(d, t, {k: v or [] for k, v in season.items()}))
+        print("Refit:", json.dumps(fit.get("props"), sort_keys=True), json.dumps(fit.get("games"), sort_keys=True),
+              json.dumps(fit.get("props_note"), sort_keys=True))
+    calib.load(data_dir)
     for lg in ("nfl", "nba"):
         try:
             data = build(lg)
@@ -720,10 +739,11 @@ if __name__ == "__main__":
         print(f"{lg}: {len(data['games'])} games, {n} props, skipped {data.get('propsSkipped')}",
               data.get("error") or "")
     lines.apply(board, data_dir, now)
-    import gamelines
     for lg in ("NFL", "NBA"):
         try:
-            gamelines.build(board["games"], lg)
+            if season.get(lg.lower()) is None:
+                raise RuntimeError("no season results")
+            gamelines.build(board["games"], lg, season[lg.lower()])
         except Exception as e:  # game lines are extra: never block the board
             print(f"{lg} game lines unavailable:", e, file=sys.stderr)
     import penalty
@@ -755,6 +775,6 @@ if __name__ == "__main__":
     rec = track.summarize(data_dir, now)
     t = rec["total"]
     print(f"Tracker: {saved} picks saved, {graded} graded, {rec['pending']} pending; "
-          f"green {t['gHit']}/{t['gN']}, red {t['rHit']}/{t['rN']}")
+          f"green plays {t['gHit']}/{t['gN']}, leans {t.get('lHit', 0)}/{t.get('lN', 0)}")
     if errors == 2:
         sys.exit(1)  # both leagues failed: make the workflow run show red

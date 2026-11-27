@@ -1,6 +1,6 @@
 """Daily Sheet: a one-page summary of the board (data/sheet.json), like the sheets Vegas books hand
-out. Used by the Daily Sheet tab and the daily email: each game's total and spread calls, its green
-OVER calls, and its STRONG UNDER calls (strongest first)."""
+out. Used by the Daily Sheet tab and the daily email: each game's total and spread calls and its green
+plays, over and under (biggest edge first)."""
 import datetime as dt
 import json
 from zoneinfo import ZoneInfo
@@ -21,14 +21,15 @@ def build(board, path, now, days=1):
         overs, unders = [], []
         for pl in g.get("players", []):
             for x in pl.get("props", []):
+                if x.get("call") != "play" or x.get("low"):
+                    continue
+                side = x.get("side")
                 row = {"n": pl["name"], "t": pl.get("team"), "s": x["stat"], "line": x["line"], "proj": x["proj"],
-                       "strong": x.get("strong", False), "odds": (x.get("over") or {}).get("odds")}
-                if x.get("call") == "hit" and not x.get("low"):
-                    overs.append(row)
-                elif x.get("call") == "miss" and x.get("strong") and x.get("under") and not x.get("low"):
-                    unders.append({**row, "odds": x["under"].get("odds")})
-        overs.sort(key=lambda r: -r["proj"])
-        unders.sort(key=lambda r: r["proj"])
+                       "ch": x.get("chance"), "edge": x.get("edge"), "strong": x.get("strong", False),
+                       "odds": (x.get(side) or {}).get("odds")}
+                (overs if side == "over" else unders).append(row)
+        overs.sort(key=lambda r: -(r["edge"] or 0))
+        unders.sort(key=lambda r: -(r["edge"] or 0))
         out.append({"lg": g["league"], "game": f"{a.get('name', '')} @ {h.get('name', '')}", "start": g["start"],
                     "lines": g.get("lines") or {}, "overs": overs, "unders": unders})
     sheet = {"date": today.isoformat(), "updatedAt": now.isoformat(timespec="seconds"),

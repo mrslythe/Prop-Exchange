@@ -1,0 +1,57 @@
+{
+ "fitted": "2026-11-27",
+ "games": {
+  "NBA|Spread": 0.4,
+  "NBA|Total": 0.0,
+  "NFL|Spread": 0.1,
+  "NFL|Total": 0.15
+ },
+ "props": {
+  "NBA": {
+   "a": -0.0386,
+   "form": 0.0,
+   "vegas": 1.2123
+  },
+  "NFL": {
+   "a": -0.1744,
+   "form": 0.0,
+   "vegas": 0.9578
+  }
+ },
+ "props_note": {
+  "games": {
+   "NBA|Spread": {
+    "blend": 0.2471,
+    "n": 74,
+    "vegas": 0.2487,
+    "w": 0.4
+   },
+   "NBA|Total": {
+    "blend": 0.2495,
+    "n": 100,
+    "vegas": 0.2495,
+    "w": 0.0
+   },
+   "NFL|Spread": {
+    "kept": true,
+    "n": 17
+   },
+   "NFL|Total": {
+    "kept": true,
+    "n": 31
+   }
+  },
+  "n": 12050,
+  "over": 47.4,
+  "test": {
+   "coinflip": 0.2494,
+   "model": 0.2464,
+   "n": 5711,
+   "vegas": 0.2466
+  }
+ },
+ "window": [
+  "2026-11-13",
+  "2026-11-26"
+ ]
+}

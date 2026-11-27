@@ -1,10 +1,11 @@
-"""Penny Blocks: five parlays per league built from the board's highest projected overs.
+"""Penny Blocks: five parlays per league built from the board's best-priced overs.
 
-Each parlay takes one stat and picks the props with the highest Projected % for it: green OVER
-calls first, then yellow leans (one leg per player, no injured players, same-game legs allowed).
-It is priced from each leg's best available over odds. Anytime TD is priced from Vegas alone, so
-its parlay is the likeliest scorers, marked low confidence.
+Each parlay takes one stat and picks the overs whose chance beats their price by the most (the
+edge, calib.py): green plays first, then yellow leans, then the likeliest of the rest (one leg per
+player, no injured players, same-game legs allowed). It is priced from each leg's best over odds.
+Anytime TD is priced from Vegas alone, so its parlay is the likeliest scorers, marked low confidence.
 """
+import calib
 
 # (stat label, legs) per league. Same-game legs are allowed.
 PARLAYS = {
@@ -49,26 +50,28 @@ def build(games):
                     for x in pl.get("props", []):
                         if x["stat"] != stat:
                             continue
-                        c = x.get("call")
-                        if x.get("low") and x.get("over"):
-                            c = "hit"  # Anytime TD: the likeliest scorers, whatever their color
-                        side = "over" if c in ("hit", "lean") else None
-                        if not side or not x.get(side):
+                        if x.get("call") == "out" or not x.get("over"):
                             continue
+                        side = "over"
                         dec = decimal_odds(x[side].get("odds"))
                         if not dec:
                             continue
-                        chance = x["proj"] if side == "over" else 100 - x["proj"]
+                        chance = x["proj"]
+                        be = calib.breakeven(x["over"].get("odds"))
+                        edge = round(chance - be, 1) if be is not None else -99
                         se = x.get("season") or {}
                         cands.append({
                             "name": pl["name"], "team": pl.get("team"), "pid": pl.get("pid"),
                             "game": label, "gameId": g["id"], "event": g.get("espnEvent"), "start": g.get("start"),
                             "side": side, "line": x["line"], "sideLine": x[side]["line"], "odds": x[side]["odds"],
                             "dec": dec, "proj": chance, "vegas": x.get("vegas" if side == "over" else "vegasU"),
-                            "strong": x.get("strong", False), "low": x.get("low", False),
+                            "strong": x.get("strong", False) and x.get("side") == "over", "low": x.get("low", False),
+                            "edge": edge, "call": x.get("call") if x.get("side") == "over" else "pass",
                             "season": se, "l5": x["hits"],
-                            # best value first: how far the chance beats the book's price, then the chance
-                            "_rank": (chance, se.get("n") or 0),
+                            # green overs first, then yellow, then the rest, each by chance.
+                            # Anytime TD: the likeliest scorers.
+                            "_rank": (chance, se.get("n") or 0) if x.get("low") else
+                                     ({"play": 2, "lean": 1}.get(x.get("call"), 0) if x.get("side") == "over" else 0, chance),
                         })
             cands.sort(key=lambda c: c["_rank"], reverse=True)
             legs, seen = [], set()

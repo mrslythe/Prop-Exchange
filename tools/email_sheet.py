@@ -5,7 +5,8 @@ from zoneinfo import ZoneInfo
 ET = ZoneInfo("America/New_York")
 d = json.load(open(sys.argv[1]))
 e = html.escape
-col = {"hit": ("OVER", "#16a34a"), "lean": ("LEAN", "#b45309"), "miss": ("UNDER", "#dc2626")}
+col = {"play": ("PLAY", "#16a34a"), "lean": ("LEAN", "#b45309"), "pass": ("PASS", "#888888")}
+ed = lambda x: f" ({x['edge']:+.1f})" if x.get("edge") is not None else ""
 day = dt.date.fromisoformat(d["date"])
 subj = f"Prop Exchange Daily Sheet: {day.strftime('%A, %B')} {day.day}"
 H, T = [], []
@@ -19,31 +20,34 @@ for g in d["games"]:
     ln = g.get("lines") or {}
     parts, tparts = [], []
     if ln.get("total"):
-        x = ln["total"]; w, c = col[x["call"]]
+        x = ln["total"]; w, c = col.get(x["call"], col["pass"])
         st = " STRONG" if x.get("strong") else ""
-        parts.append(f'Total {x["line"]:g}: <b style="color:{c}">{w} {x["proj"]}%{st}</b>')
-        tparts.append(f"Total {x['line']:g}: {w} {x['proj']}%{st}")
+        sd = x.get("side", "over").upper()
+        parts.append(f'Total {x["line"]:g}: <b style="color:{c}">{w} {sd} {x.get("chance", x["proj"])}%{ed(x)}{st}</b> <span style="color:#888">· ours {x.get("expected")}</span>')
+        tparts.append(f"Total {x['line']:g}: {w} {sd} {x.get('chance', x['proj'])}%{ed(x)}{st}")
     if ln.get("spread"):
-        x = ln["spread"]; c = col[x["call"]][1]
+        x = ln["spread"]; w, c = col.get(x["call"], col["pass"])
         st = " STRONG" if x.get("strong") else ""
-        parts.append(f'Spread: <b style="color:{c}">{e(x["pick"])} {x["chance"]}%{st}</b>')
-        tparts.append(f"Spread: {x['pick']} {x['chance']}%{st}")
+        parts.append(f'Spread: <b style="color:{c}">{w} {e(x["pick"])} {x["chance"]}%{ed(x)}{st}</b>')
+        tparts.append(f"Spread: {w} {x['pick']} {x['chance']}%{ed(x)}{st}")
     if parts:
         H.append(f'<p style="margin:2px 0">{" &nbsp;·&nbsp; ".join(parts)}</p>'); T.append("  " + " | ".join(tparts))
-    for key, label, pre, c, cap in (("overs", "Overs", "o", "#16a34a", 12), ("unders", "Strong unders", "u", "#dc2626", 8)):
+    for key, label, pre, c, cap in (("overs", "Green overs", "o", "#16a34a", 10), ("unders", "Green unders", "u", "#16a34a", 10)):
         rows = g.get(key) or []
         if rows:
-            items = ", ".join(f'{e(r["n"])} {e(r["s"])} <span style="color:{c}">{pre}{r["line"]:g} {r["proj"]}%{" ★" if r.get("strong") else ""}</span>' for r in rows[:cap])
+            items = ", ".join(f'{e(r["n"])} {e(r["s"])} <span style="color:{c}">{pre}{r["line"]:g} {r.get("ch", r["proj"])}%{ed(r)}{" ★" if r.get("strong") else ""}</span>' for r in rows[:cap])
             more = f" <span style='color:#888'>+{len(rows) - cap} more</span>" if len(rows) > cap else ""
             H.append(f'<p style="margin:4px 0;font-size:14px"><b>{label}:</b> {items}{more}</p>')
-            T.append(f"  {label}: " + ", ".join(f"{r['n']} {r['s']} {pre}{r['line']:g} {r['proj']}%{' *' if r.get('strong') else ''}" for r in rows[:cap]))
+            T.append(f"  {label}: " + ", ".join(f"{r['n']} {r['s']} {pre}{r['line']:g} {r.get('ch', r['proj'])}%{ed(r)}{' *' if r.get('strong') else ''}" for r in rows[:cap]))
 if d.get("parlays"):
     H.append('<h3 style="margin:16px 0 4px;border-top:1px solid #ddd;padding-top:10px">Penny Blocks</h3>')
     T.append("\nPenny Blocks")
     for p in d["parlays"]:
         H.append(f'<p style="margin:2px 0;font-size:14px"><b>{e(p["league"])} {e(p["stat"])}</b> {e(p.get("american") or "")}: {e(", ".join(p["legs"]))}</p>')
         T.append(f"  {p['league']} {p['stat']} {p.get('american') or ''}: {', '.join(p['legs'])}")
-foot = "Projected % is the chance of the over, from each player's season and last 5 games plus a little of the Vegas price. For entertainment; bet responsibly."
+foot = ("Each % is our chance of that side, from a model refit every Monday on the last two weeks of results. "
+        "(+n) = edge: how many points that chance beats what the odds need to break even. Green PLAY = +3 or more, "
+        "yellow LEAN = 0 to +3, PASS = neither side beats its price. ★ = +6 or more. For entertainment; bet responsibly.")
 H.append(f'<p style="margin:18px 0 0;color:#777;font-size:12px">{foot}</p></div>'); T.append("\n" + foot)
 json.dump({"subject": subj, "html": "".join(H), "text": "\n".join(T)}, open(sys.argv[2], "w"))
 print(subj, len("".join(H)))

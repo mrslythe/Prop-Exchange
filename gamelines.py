@@ -1,11 +1,13 @@
-"""Game lines: calls on each game's total (over/under) and point spread, same idea as the props.
+"""Game lines: calls on each game's total (over/under) and point spread (v2, Nov 27 2026).
 
-Total:  for each team, how often its games this season (and its last 5) went over today's total.
-        Form % = 60% season + 40% last 5, averaged over the two teams; Projected % = 75% Form +
-        25% the Vegas % of the over. Green OVER / yellow LEAN / red UNDER, as for props.
-Spread: how often the away team would have covered today's number (its own margins), and how
-        often the home team would have failed to cover its side; same 60/40 and Vegas blend. The
-        call names the likelier side: green at 58%+, yellow below that. STRONG at 70%+.
+Each game gets a predicted score from team power ratings (ratings.py: offense and defense for every
+team, adjusted for opponents and home field). That prediction becomes a chance against the Vegas
+number, and is blended with Vegas' own chance (bookmaker's cut removed):
+
+    chance = w * our model + (1 - w) * Vegas      (w per league and market, refit every Monday)
+
+The call is the same edge rule as the props (calib.decide): green PLAY when the better side beats
+what its odds need by 3+ points, yellow LEAN 0-3, red PASS when neither side does. STRONG at +6.
 
 Scores come from ESPN team schedules (regular season, current season).
 """
@@ -15,9 +17,7 @@ import json
 
 from build_board import ESPN_SPORT, get, implied, num
 import calib
-
-MIN_GAMES = 3
-
+import ratings
 
 def team_log(league, tid):
     """Completed regular-season games, newest first: event, pf (points for), pa (points against)."""
@@ -43,20 +43,6 @@ def team_log(league, tid):
     return out
 
 
-def _rate(xs, test):
-    xs = list(xs)
-    return (sum(1 for x in xs if test(x)) / len(xs)) if xs else None
-
-
-def _form(log, test):
-    """60% season rate + 40% last-5 rate (leaning on the last 5 with few games), as a %."""
-    if not log or len(log) < MIN_GAMES:
-        return None
-    s, l5 = _rate(log, test), _rate(log[:5], test)
-    w = 0.6 if len(log) >= 5 else 0.6 * len(log) / 5
-    return 100 * (w * s + (1 - w) * l5)
-
-
 def _line(v):
     v = str(v or "").strip().lower().lstrip("ou")
     if v in ("pk", "pick", "even"):
@@ -64,59 +50,117 @@ def _line(v):
     return num(v.replace("+", ""))
 
 
-def build(games, league):
+def build(games, league, season=None):
     """Adds g["lines"] = {"total": {...}, "spread": {...}} to each game of this league."""
     lg = league.lower()
     todo = [g for g in games if g.get("league") == league and g.get("espnAway") and g.get("espnHome")]
-    tids = sorted({t for g in todo for t in (g["espnAway"], g["espnHome"])})
-    with cf.ThreadPoolExecutor(8) as ex:
-        logs = dict(zip(tids, ex.map(lambda t: team_log(lg, t), tids)))
+    if not todo:
+        return
+    season = season if season is not None else ratings.season_games(lg)
+    R = ratings.Ratings(lg, season)
+    W = calib.model()["games"]
     for g in todo:
         a, h = g["teams"].get("away") or {}, g["teams"].get("home") or {}
-        la, lh = logs.get(g["espnAway"]), logs.get(g["espnHome"])
+        aw, hm = str(g["espnAway"]), str(g["espnHome"])
         out = {}
         # ---- total
-        tot = (a.get("total") or {})
+        tot, totu = (a.get("total") or {}), (h.get("total") or {})
         line = _line(tot.get("v"))
-        if line and la and lh:
-            fa = _form(la, lambda x: x["pf"] + x["pa"] > line)
-            fh = _form(lh, lambda x: x["pf"] + x["pa"] > line)
-            if fa is not None and fh is not None:
-                form = round((fa + fh) / 2)
-                vg = implied(tot.get("odds"))
-                vgu = implied((h.get("total") or {}).get("odds"))
-                proj = calib.project(form, vg)
-                c = calib.call(proj)
-                avg = lambda log: sum(x["pf"] for x in log) / len(log)
-                allow = lambda log: sum(x["pa"] for x in log) / len(log)
-                exp = ((avg(la) + allow(lh)) / 2) + ((avg(lh) + allow(la)) / 2)
-                out["total"] = {"line": line, "overOdds": tot.get("odds"), "underOdds": (h.get("total") or {}).get("odds"),
-                                "vegas": vg, "vegasU": vgu, "form": form, "proj": proj, "call": c,
-                                "strong": calib.strong(proj), "expected": round(exp, 1),
-                                "awayAvg": round(sum(x["pf"] + x["pa"] for x in la) / len(la), 1),
-                                "homeAvg": round(sum(x["pf"] + x["pa"] for x in lh) / len(lh), 1)}
+        if line:
+            c = ratings.chances(R, hm, aw, line, None)
+            vg, vgu = implied(tot.get("odds")), implied(totu.get("odds"))
+            mk = calib.no_vig(vg, vgu)
+            if c and mk is not None:
+                w = W.get(f"{league}|Total", 0.25)
+                p = round(w * c["over"] + (1 - w) * mk, 1)
+                d = calib.decide(p, tot.get("odds"), totu.get("odds"))
+                out["total"] = {"line": line, "overOdds": tot.get("odds"), "underOdds": totu.get("odds"),
+                                "vegas": vg, "vegasU": vgu, "market": round(mk, 1), "model": round(c["over"], 1),
+                                "w": w, "proj": round(p), **d,
+                                "expected": c["total"], "score": [c["away"], c["home"]]}
         # ---- spread (from the away side's number: +2.5 means away gets 2.5 points)
-        sp = (a.get("spread") or {})
+        sp, sph = (a.get("spread") or {}), (h.get("spread") or {})
         s = _line(sp.get("v"))
-        if s is not None and sp.get("v") and la and lh:
-            fa = _form(la, lambda x: x["pf"] - x["pa"] + s > 0)      # away team would cover +s
-            fh = _form(lh, lambda x: x["pf"] - x["pa"] - s < 0)      # home team would fail to cover -s
-            if fa is not None and fh is not None:
-                form = round((fa + fh) / 2)
-                vg = implied(sp.get("odds"))
-                proj = calib.project(form, vg)            # chance the away side covers
-                side = "away" if proj >= 50 else "home"
-                chance = proj if side == "away" else 100 - proj
+        if s is not None and sp.get("v"):
+            c = ratings.chances(R, hm, aw, None, s)
+            vg, vgh = implied(sp.get("odds")), implied(sph.get("odds"))
+            mk = calib.no_vig(vg, vgh)
+            if c and mk is not None:
+                w = W.get(f"{league}|Spread", 0.25)
+                p = round(w * c["awayCover"] + (1 - w) * mk, 1)       # chance the away side covers
+                d = calib.decide(p, sp.get("odds"), sph.get("odds"))  # "over" = away, "under" = home
+                side = "away" if d["side"] == "over" else "home"
                 team = a if side == "away" else h
                 num_ = s if side == "away" else -s
-                out["spread"] = {"line": s, "awayOdds": sp.get("odds"), "homeOdds": (h.get("spread") or {}).get("odds"),
-                                 "vegas": vg, "form": form, "proj": proj, "side": side,
-                                 "team": team.get("name"), "pick": f"{team.get('name')} {'+' if num_ > 0 else ''}{num_:g}" if num_ else f"{team.get('name')} PK",
-                                 "chance": chance, "call": "hit" if chance >= calib.GREEN else "lean",
-                                 "strong": chance >= calib.STRONG_OVER,
-                                 "awayCover": round(fa), "homeFail": round(fh)}
+                # our own line: the predicted margin, from the away side's view
+                ours = -c["margin"]
+                out["spread"] = {"line": s, "awayOdds": sp.get("odds"), "homeOdds": sph.get("odds"),
+                                 "vegas": vg, "vegasH": vgh, "market": round(mk, 1), "model": round(c["awayCover"], 1),
+                                 "w": w, "proj": round(p), "side": side, "chance": d["chance"], "edge": d["edge"],
+                                 "call": d["call"], "strong": d["strong"],
+                                 "team": team.get("name"),
+                                 "pick": f"{team.get('name')} {'+' if num_ > 0 else ''}{num_:g}" if num_ else f"{team.get('name')} PK",
+                                 "ourLine": round(ours, 1), "score": [c["away"], c["home"]]}
         if out:
             g["lines"] = out
+
+
+def refit_weights(data_dir, today, season_by_league, days=42, min_n=40):
+    """Grid-search each market's model weight (0 to 0.6) on the last 6 weeks of graded game calls:
+    the weight whose blended chance would have scored best. Fewer than 40 graded: keep the old one."""
+    import glob
+    import os
+    since = (today - dt.timedelta(days=days)).isoformat()
+    rows = {}
+    for path in sorted(glob.glob(os.path.join(data_dir, "gamepicks", "*.json"))):
+        if os.path.basename(path)[:-5] < since:
+            continue
+        for p in json.load(open(path))["picks"].values():
+            if p.get("r") not in ("over", "under", "home", "away"):
+                continue
+            rows.setdefault(f"{p['lg']}|{p['s']}", []).append(p)
+    weights, note, cache = {}, {}, {}
+    for key, ps in rows.items():
+        lg = key.split("|")[0].lower()
+        season = season_by_league.get(lg) or []
+        by_ev = {g["event"]: g for g in season}
+        pts = []
+        for p in ps:
+            g = by_ev.get(str(p["ev"]))
+            if not g:
+                continue
+            day = g["date"][:10]
+            if (lg, day) not in cache:
+                cache[(lg, day)] = ratings.Ratings(lg, [q for q in season if q["date"] < g["date"]])
+            R = cache[(lg, day)]
+            if p["s"] == "Total":
+                c = ratings.chances(R, g["home"], g["away"], p["line"], None, g["neutral"])
+                model, y = c and c["over"], p["r"] == "over"
+                mk = p.get("mk")
+                if mk is None and p.get("vg") is not None:  # older picks saved only their own side's price
+                    mk = p["vg"] / 1.045 if p.get("side") == "over" else 100 - p["vg"] / 1.045
+            else:
+                c = ratings.chances(R, g["home"], g["away"], None, p["line"], g["neutral"])
+                model, y = c and c["awayCover"], p["r"] == "away"
+                mk = p.get("mk")
+                if mk is None and p.get("vg") is not None:
+                    mk = p["vg"] / 1.045 if p.get("side") == "away" else 100 - p["vg"] / 1.045
+            if model is None or mk is None:
+                continue
+            pts.append((model, mk, 1.0 if y else 0.0))
+        if len(pts) < min_n:
+            note[key] = {"n": len(pts), "kept": True}
+            continue
+        best = None
+        for i in range(0, 13):
+            w = i * 0.05
+            b = sum(((w * m + (1 - w) * k) / 100 - y) ** 2 for m, k, y in pts) / len(pts)
+            if best is None or b < best[1] - 1e-6:
+                best = (w, b)
+        vegas = sum((k / 100 - y) ** 2 for m, k, y in pts) / len(pts)
+        weights[key] = round(best[0], 2)
+        note[key] = {"n": len(pts), "w": round(best[0], 2), "blend": round(best[1], 4), "vegas": round(vegas, 4)}
+    return {"weights": weights, "note": note}
 
 
 def final_score(league, event, home_tid, cache):

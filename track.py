@@ -90,8 +90,9 @@ def record_picks(board, data_dir, now):
                     "n": pl["name"], "pid": pl["pid"], "s": x["stat"], "k": x.get("keys", []),
                     "line": x["line"], "proj": x["proj"], "call": x["call"], "vg": x.get("vegas"),
                     "inj": inj, "r": None, "a": None,
-                    # v3 (Nov 12 2026): green over, yellow lean, red under (thresholds in calib.py)
-                    "v": 3, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
+                    # v4 (Nov 27 2026): call = play/lean/pass on "side" by its edge over the price (calib.py)
+                    "v": 4, "form": x.get("form"), "vu": x.get("vegasU"), "strong": x.get("strong", False),
+                    "side": x.get("side"), "edge": x.get("edge"), "ch": x.get("chance"), "pb": x.get("projBase"),
                     "oo": (x.get("over") or {}).get("odds"), "uo": (x.get("under") or {}).get("odds"),
                     "ol": (x.get("open") or {}).get("line"), "mv": x.get("move"),
                 }
@@ -171,9 +172,10 @@ def _write_players(data_dir, now, days=30, keep=15):
             e = out.setdefault(k, {"n": 0, "over": 0, "gN": 0, "gHit": 0, "recent": []})
             e["n"] += 1
             e["over"] += p["r"] == "over"
-            if p["call"] in ("hit", "miss"):  # calls the board got right, over or under
+            side = _side(p)
+            if side and p["call"] in ("hit", "miss", "play"):  # green calls the board got right
                 e["gN"] += 1
-                e["gHit"] += p["r"] == ("over" if p["call"] == "hit" else "under")
+                e["gHit"] += p["r"] == side
             e["recent"].append({"d": day, "s": p["s"], "line": p["line"], "a": p["a"], "r": p["r"], "call": p["call"]})
     for e in out.values():
         e["recent"] = sorted(e["recent"], key=lambda x: x["d"], reverse=True)[:keep]
@@ -251,6 +253,13 @@ def grade(data_dir, now, days_back=14):
     return graded
 
 
+def _side(p):
+    """The side a pick called: v4 saves it; v3 green was the over, red the under, yellow the over."""
+    if p.get("v", 1) >= 4:
+        return p.get("side")
+    return {"hit": "over", "lean": "over", "miss": "under"}.get(p["call"])
+
+
 def summarize(data_dir, now):
     """Build data/record.json from every graded pick."""
     def blank():
@@ -263,13 +272,30 @@ def summarize(data_dir, now):
             b[k + "B"] = b.get(k + "B", 0) + 1  # bets that had a price
 
     def add(b, p):
+        """v4: green plays (g), yellow leans (l), strong (s), each graded on its own side; red passes counted."""
+        side = _side(p)
+        if p["call"] == "pass":
+            b["pN"] = b.get("pN", 0) + 1
+            return
+        if not side or p["call"] not in ("play", "lean"):
+            return
+        k = "g" if p["call"] == "play" else "l"
+        b[k + "N"] = b.get(k + "N", 0) + 1
+        b[k + "Hit"] = b.get(k + "Hit", 0) + (p["r"] == side)
+        b[k + "O"] = b.get(k + "O", 0) + (side == "over")  # how many of them were overs
+        money(b, k, p, side)
+        if p.get("strong"):
+            b["sN"] = b.get("sN", 0) + 1
+            b["sHit"] = b.get("sHit", 0) + (p["r"] == side)
+            money(b, "s", p, side)
+
+    def add_v3(b, p):
+        """The Nov 12-26 version: green over, yellow lean (over), red under."""
         if p["call"] == "miss" and p["s"] == "Anytime TD":
-            return  # no "no TD" bet on the board: a red TD call is not an Under pick
-        side = "over" if p["call"] in ("hit", "lean") else "under"
-        if p.get("v", 1) >= 3 and p["call"] in ("hit", "miss", "lean"):
+            return
+        side = _side(p)
+        if p["call"] in ("hit", "miss", "lean"):
             money(b, {"hit": "g", "miss": "r", "lean": "l"}[p["call"]], p, side)
-            if p.get("strong"):
-                money(b, "s", p, side)
         if p["call"] == "hit":
             b["gN"] += 1
             b["gHit"] += p["r"] == "over"
@@ -279,11 +305,9 @@ def summarize(data_dir, now):
         elif p["call"] == "lean":
             b["lN"] = b.get("lN", 0) + 1
             b["lHit"] = b.get("lHit", 0) + (p["r"] == "over")
-        if p.get("strong"):
-            b["sN"] = b.get("sN", 0) + 1
-            b["sHit"] = b.get("sHit", 0) + (p["r"] == ("over" if p["call"] == "hit" else "under"))
 
     v1 = blank()  # earlier versions (Nov 6-12 2026), kept for comparison
+    v3 = blank()  # the form-based version (Nov 12-26 2026)
 
     total, by_league, by_stat, days = blank(), {}, {}, []
     buckets = {k: {"n": 0, "over": 0} for k in ("0-29", "30-45", "46-57", "58-69", "70-100")}
@@ -304,7 +328,10 @@ def summarize(data_dir, now):
             if p["r"] in ("dnp", "push") or p.get("inj") in OUT_STATUSES or p["call"] == "out":
                 continue  # no action: not counted either way
             if p.get("v", 1) < 3:
-                add(v1, p)
+                add_v3(v1, p)
+                continue
+            if p.get("v", 1) < 4:
+                add_v3(v3, p)
                 continue
             for b in (total, dayb, by_league.setdefault(p["lg"], blank()), by_stat.setdefault(f"{p['lg']} {p['s']}", blank())):
                 add(b, p)
@@ -314,7 +341,7 @@ def summarize(data_dir, now):
             buckets[bk]["n"] += 1
             buckets[bk]["over"] += p["r"] == "over"
             graded_today.append(p)
-        if dayb["gN"] or dayb["rN"]:
+        if dayb["gN"] or dayb.get("lN"):
             days.append({"d": day, **dayb})
             latest = (day, graded_today)
     rec = {
@@ -327,13 +354,15 @@ def summarize(data_dir, now):
         "days": days[-30:],
         "latest": None,
         "v1": v1,
+        "v3": v3,
+        "model": _model_note(data_dir),
     }
     if latest:
         day, picks = latest
-        calls = sorted((p for p in picks if p["call"] in ("hit", "miss")
-                        and not (p["call"] == "miss" and p["s"] == "Anytime TD")), key=lambda p: -abs(p["proj"] - 50))  # green and red calls
+        calls = sorted((p for p in picks if p["call"] == "play"), key=lambda p: -(p.get("edge") or 0))  # green plays
         rec["latest"] = {"d": day, "picks": [
             {"n": p["n"], "lg": p["lg"], "gl": p["gl"], "s": p["s"], "line": p["line"], "call": p["call"],
+             "side": p.get("side"), "edge": p.get("edge"), "ch": p.get("ch"),
              "strong": p.get("strong", False), "a": p["a"], "proj": p["proj"], "r": p["r"]} for p in calls]}
     pars = _parlay_results(data_dir)
     done = [p for p in pars if p["res"] in ("won", "lost")]
@@ -360,6 +389,15 @@ def summarize(data_dir, now):
     return rec
 
 
+def _model_note(data_dir):
+    try:
+        with open(f"{data_dir}/calib.json") as f:
+            m = json.load(f)
+    except (OSError, ValueError):
+        return None
+    return {k: m.get(k) for k in ("fitted", "window", "props", "games", "props_note")}
+
+
 # ---------------- game lines (totals and spreads) ----------------
 def record_games(board, data_dir, now):
     """Save each game's total and spread call (data/gamepicks/<date>.json) until the game starts."""
@@ -376,20 +414,23 @@ def record_games(board, data_dir, now):
         a, h = (g.get("teams") or {}).get("away", {}), (g.get("teams") or {}).get("home", {})
         base = {"lg": g["league"], "ev": g["espnEvent"], "gl": f"{a.get('name', '')} @ {h.get('name', '')}",
                 "st": g["start"], "home": g.get("espnHome"), "r": None, "a": None}
+        # v2 (Nov 27 2026): power ratings blended with Vegas; play/lean/pass by edge. "mk" = Vegas'
+        # chance (cut removed) of the over / the away side, "md" = our model's, "proj" = the side's chance.
         t = ln.get("total")
         if t:
+            under = t["side"] == "under"
             data["picks"][f"{g['league']}|{g['espnEvent']}|Total"] = {
-                **base, "s": "Total", "line": t["line"], "proj": t["proj"], "call": t["call"], "strong": t["strong"],
-                "side": "under" if t["call"] == "miss" else "over",
-                "odds": t["underOdds"] if t["call"] == "miss" else t["overOdds"],
-                "vg": t["vegasU"] if t["call"] == "miss" else t["vegas"]}
+                **base, "s": "Total", "line": t["line"], "proj": t["chance"], "call": t["call"], "strong": t["strong"],
+                "side": t["side"], "edge": t.get("edge"), "mk": t.get("market"), "md": t.get("model"), "v": 2,
+                "odds": t["underOdds"] if under else t["overOdds"],
+                "vg": t["vegasU"] if under else t["vegas"]}
         s = ln.get("spread")
         if s:
             data["picks"][f"{g['league']}|{g['espnEvent']}|Spread"] = {
                 **base, "s": "Spread", "line": s["line"], "proj": s["chance"], "call": s["call"], "strong": s["strong"],
-                "side": s["side"], "pick": s["pick"],
+                "side": s["side"], "pick": s["pick"], "edge": s.get("edge"), "mk": s.get("market"), "md": s.get("model"), "v": 2,
                 "odds": s["awayOdds"] if s["side"] == "away" else s["homeOdds"],
-                "vg": s["vegas"] if s["side"] == "away" else None}
+                "vg": s["vegas"] if s["side"] == "away" else s.get("vegasH")}
     for path, data in files.items():
         _save(path, data)
 
@@ -428,7 +469,7 @@ def grade_games(data_dir, now):
 
 def summarize_games(data_dir, this_week=None):
     """Record for game-line calls: per market and color, hits and $10 profit (all time and this week)."""
-    out, wk = {}, {}
+    out, wk, old = {}, {}, {}
     recent = []
     for path in sorted(glob.glob(f"{data_dir}/gamepicks/*.json")):
         day = os.path.basename(path)[:-5]
@@ -439,6 +480,16 @@ def summarize_games(data_dir, this_week=None):
             d0 = dt.date.fromisoformat(day)
             in_week = this_week and (d0 - dt.timedelta(days=d0.weekday())).isoformat() == this_week
             dec = _dec(p.get("odds"), p.get("vg"))
+            if p.get("v", 1) < 2:  # the hit-rate version (Nov 12-26): kept apart for comparison
+                b = old.setdefault(p["s"], {"n": 0, "hit": 0, "P": 0.0, "B": 0})
+                b["n"] += 1
+                b["hit"] += won
+                if dec:
+                    b["P"] = round(b["P"] + (STAKE * (dec - 1) if won else -STAKE), 2)
+                    b["B"] += 1
+                continue
+            if p["call"] == "pass":
+                continue  # red: neither side beat its price, so no bet
             for tgt in ((out, wk) if in_week else (out,)):
                 b = tgt.setdefault(p["s"], {}).setdefault(p["call"], {"n": 0, "hit": 0, "P": 0.0, "B": 0})
                 b["n"] += 1
@@ -449,7 +500,7 @@ def summarize_games(data_dir, this_week=None):
             recent.append({"d": day, "lg": p["lg"], "gl": p["gl"], "s": p["s"], "call": p["call"],
                            "pick": p.get("pick") or f"{p['side'].title()} {p['line']:g}", "proj": p["proj"],
                            "a": p["a"], "won": won})
-    return {"by": out, "week": wk, "recent": recent[-20:][::-1]}
+    return {"by": out, "week": wk, "old": old, "recent": recent[-20:][::-1]}
 
 
 # ---------------- Blue Chips (big lines that went over last game) ----------------
